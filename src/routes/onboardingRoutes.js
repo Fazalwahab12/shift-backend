@@ -1,0 +1,218 @@
+const express = require('express');
+const { body, param, query } = require('express-validator');
+const OnboardingController = require('../controllers/onboardingController');
+const router = express.Router();
+
+/**
+ * Onboarding Routes
+ * Base path: /api/onboarding
+ */
+
+/**
+ * @route   POST /api/onboarding
+ * @desc    Create or update onboarding data
+ * @access  Public
+ */
+router.post('/', [
+  body('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('userType')
+    .isIn(['seeker', 'company'])
+    .withMessage('User type must be either seeker or company'),
+  body('selectedIndustries')
+    .optional()
+    .isArray()
+    .withMessage('Selected industries must be an array'),
+  body('selectedRoles')
+    .optional()
+    .isArray()
+    .withMessage('Selected roles must be an array'),
+  body('experienceLevel')
+    .optional()
+    .isIn(['entry', 'intermediate', 'senior'])
+    .withMessage('Experience level must be entry, intermediate, or senior'),
+  body('hiringNeeds')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Hiring needs must be between 1 and 100 characters'),
+  body('typicalHiringRoles')
+    .optional()
+    .isArray()
+    .withMessage('Typical hiring roles must be an array'),
+  body('referralSource')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Referral source must be between 1 and 100 characters'),
+  body('referralDetails')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Referral details must not exceed 500 characters')
+], OnboardingController.createOrUpdateOnboarding);
+
+/**
+ * @route   GET /api/onboarding/stats
+ * @desc    Get onboarding statistics
+ * @access  Public
+ */
+router.get('/stats', [
+  query('userType')
+    .optional()
+    .isIn(['seeker', 'company'])
+    .withMessage('User type must be either seeker or company')
+], OnboardingController.getStats);
+
+/**
+ * @route   GET /api/onboarding/popular-industries
+ * @desc    Get popular industries
+ * @access  Public
+ */
+router.get('/popular-industries', [
+  query('userType')
+    .optional()
+    .isIn(['seeker', 'company'])
+    .withMessage('User type must be either seeker or company'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50')
+], OnboardingController.getPopularIndustries);
+
+/**
+ * @route   GET /api/onboarding/popular-roles
+ * @desc    Get popular roles
+ * @access  Public
+ */
+router.get('/popular-roles', [
+  query('userType')
+    .optional()
+    .isIn(['seeker', 'company'])
+    .withMessage('User type must be either seeker or company'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50')
+], OnboardingController.getPopularRoles);
+
+/**
+ * @route   GET /api/onboarding/:userId
+ * @desc    Get onboarding data by user ID
+ * @access  Public
+ */
+router.get('/:userId', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required')
+], OnboardingController.getOnboardingByUserId);
+
+/**
+ * @route   POST /api/onboarding/:userId/industry
+ * @desc    Add industry preference
+ * @access  Public
+ */
+router.post('/:userId/industry', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('industry')
+    .notEmpty()
+    .withMessage('Industry is required')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Industry must be between 1 and 100 characters')
+], OnboardingController.addIndustry);
+
+/**
+ * @route   DELETE /api/onboarding/:userId/industry/:industry
+ * @desc    Remove industry preference
+ * @access  Public
+ */
+router.delete('/:userId/industry/:industry', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  param('industry')
+    .notEmpty()
+    .withMessage('Industry is required')
+], OnboardingController.removeIndustry);
+
+/**
+ * @route   POST /api/onboarding/:userId/role
+ * @desc    Add role preference
+ * @access  Public
+ */
+router.post('/:userId/role', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('role')
+    .notEmpty()
+    .withMessage('Role is required')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Role must be between 1 and 100 characters')
+], OnboardingController.addRole);
+
+/**
+ * @route   DELETE /api/onboarding/:userId/role/:role
+ * @desc    Remove role preference
+ * @access  Public
+ */
+router.delete('/:userId/role/:role', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  param('role')
+    .notEmpty()
+    .withMessage('Role is required')
+], OnboardingController.removeRole);
+
+/**
+ * @route   POST /api/onboarding/:userId/complete-step
+ * @desc    Complete onboarding step
+ * @access  Public
+ */
+router.post('/:userId/complete-step', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('stepName')
+    .notEmpty()
+    .withMessage('Step name is required')
+    .isIn(['industry_selection', 'role_selection', 'experience_level', 'hiring_needs', 'referral_source'])
+    .withMessage('Invalid step name')
+], OnboardingController.completeStep);
+
+/**
+ * @route   PUT /api/onboarding/:userId/experience-level
+ * @desc    Update experience level (for seekers)
+ * @access  Public
+ */
+router.put('/:userId/experience-level', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('experienceLevel')
+    .isIn(['entry', 'intermediate', 'senior'])
+    .withMessage('Experience level must be entry, intermediate, or senior')
+], OnboardingController.updateExperienceLevel);
+
+/**
+ * @route   PUT /api/onboarding/:userId/referral
+ * @desc    Update referral source
+ * @access  Public
+ */
+router.put('/:userId/referral', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('referralSource')
+    .notEmpty()
+    .withMessage('Referral source is required')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Referral source must be between 1 and 100 characters'),
+  body('referralDetails')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Referral details must not exceed 500 characters')
+], OnboardingController.updateReferralSource);
+
+module.exports = router;

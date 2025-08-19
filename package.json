@@ -1,0 +1,58 @@
+{
+  "name": "shift-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Shift Job Marketplace App - Oman",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "setup": "node scripts/setup.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/",
+    "clean": "rm -rf node_modules package-lock.json && npm install",
+    "health": "curl -f http://localhost:3000/health || echo 'Server not running'",
+    "docs": "echo 'API Documentation: docs/API_DOCUMENTATION.md'"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "firebase",
+    "firestore",
+    "job-marketplace",
+    "api",
+    "backend",
+    "oman"
+  ],
+  "author": "Shift Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "express-rate-limit": "^7.1.5",
+    "compression": "^1.7.4",
+    "express-validator": "^7.0.1",
+    "moment": "^2.29.4",
+    "uuid": "^9.0.1",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.54.0",
+    "prettier": "^3.1.0",
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
