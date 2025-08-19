@@ -41,34 +41,30 @@ class OnboardingController {
         // Update existing onboarding data
         await existingOnboarding.update(onboardingData);
         
-        // Check if onboarding is completed and update user
-        if (existingOnboarding.isCompleted) {
-          await user.completeOnboarding();
-        }
+        // Mark user onboarding as completed
+        await user.completeOnboarding();
         
         res.status(200).json({
           success: true,
           message: 'Onboarding data updated successfully',
           data: {
             ...existingOnboarding.toPublicJSON(),
-            nextStep: existingOnboarding.isCompleted ? 'profile_creation' : 'continue_onboarding'
+            nextStep: 'profile_creation'
           }
         });
       } else {
         // Create new onboarding data
         const newOnboarding = await OnboardingData.create(userId, userType, onboardingData);
         
-        // Check if onboarding is completed and update user
-        if (newOnboarding.isCompleted) {
-          await user.completeOnboarding();
-        }
+        // Mark user onboarding as completed
+        await user.completeOnboarding();
         
         res.status(201).json({
           success: true,
           message: 'Onboarding data created successfully',
           data: {
             ...newOnboarding.toPublicJSON(),
-            nextStep: newOnboarding.isCompleted ? 'profile_creation' : 'continue_onboarding'
+            nextStep: 'profile_creation'
           }
         });
       }
@@ -296,40 +292,18 @@ class OnboardingController {
       }
 
       const { userId } = req.params;
-      const { stepName } = req.body;
 
-      const onboardingData = await OnboardingData.findByUserId(userId);
-      if (!onboardingData) {
-        return res.status(404).json({
-          success: false,
-          message: 'Onboarding data not found'
-        });
-      }
-
-      await onboardingData.completeStep(stepName);
-
-      // If onboarding is completed, update user record
-      if (onboardingData.isCompleted) {
-        const user = await User.findById(userId);
-        if (user) {
-          await user.completeOnboarding();
-        }
-      }
-
-      // Determine next step
-      let nextStep = 'continue_onboarding';
-      if (onboardingData.isCompleted) {
-        nextStep = 'profile_creation';
+      // Mark user onboarding as completed regardless of step
+      const user = await User.findById(userId);
+      if (user) {
+        await user.completeOnboarding();
       }
 
       res.status(200).json({
         success: true,
         message: 'Step completed successfully',
         data: {
-          completedSteps: onboardingData.completedSteps,
-          isCompleted: onboardingData.isCompleted,
-          completionPercentage: Math.round((onboardingData.completedSteps.length / (onboardingData.userType === 'seeker' ? 4 : 3)) * 100),
-          nextStep: nextStep
+          nextStep: 'profile_creation'
         }
       });
 
@@ -427,11 +401,13 @@ class OnboardingController {
     }
   }
 
+
+
   /**
-   * Update experience level (for seekers)
-   * PUT /api/onboarding/:userId/experience-level
+   * Add social media preference
+   * POST /api/onboarding/:userId/social-media
    */
-  static async updateExperienceLevel(req, res) {
+  static async addSocialMediaPreference(req, res) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -443,7 +419,7 @@ class OnboardingController {
       }
 
       const { userId } = req.params;
-      const { experienceLevel } = req.body;
+      const { socialMedia } = req.body;
 
       const onboardingData = await OnboardingData.findByUserId(userId);
       if (!onboardingData) {
@@ -453,18 +429,18 @@ class OnboardingController {
         });
       }
 
-      await onboardingData.update({ experienceLevel });
+      await onboardingData.addSocialMediaPreference(socialMedia);
 
       res.status(200).json({
         success: true,
-        message: 'Experience level updated successfully',
+        message: 'Social media preference added successfully',
         data: {
-          experienceLevel: onboardingData.experienceLevel
+          preferredSocialMedia: onboardingData.preferredSocialMedia
         }
       });
 
     } catch (error) {
-      console.error('Error in updateExperienceLevel:', error);
+      console.error('Error in addSocialMediaPreference:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -474,22 +450,12 @@ class OnboardingController {
   }
 
   /**
-   * Update referral source
-   * PUT /api/onboarding/:userId/referral
+   * Remove social media preference
+   * DELETE /api/onboarding/:userId/social-media/:socialMedia
    */
-  static async updateReferralSource(req, res) {
+  static async removeSocialMediaPreference(req, res) {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-
-      const { userId } = req.params;
-      const { referralSource, referralDetails } = req.body;
+      const { userId, socialMedia } = req.params;
 
       const onboardingData = await OnboardingData.findByUserId(userId);
       if (!onboardingData) {
@@ -499,22 +465,18 @@ class OnboardingController {
         });
       }
 
-      await onboardingData.update({ 
-        referralSource,
-        referralDetails: referralDetails || null
-      });
+      await onboardingData.removeSocialMediaPreference(decodeURIComponent(socialMedia));
 
       res.status(200).json({
         success: true,
-        message: 'Referral source updated successfully',
+        message: 'Social media preference removed successfully',
         data: {
-          referralSource: onboardingData.referralSource,
-          referralDetails: onboardingData.referralDetails
+          preferredSocialMedia: onboardingData.preferredSocialMedia
         }
       });
 
     } catch (error) {
-      console.error('Error in updateReferralSource:', error);
+      console.error('Error in removeSocialMediaPreference:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -522,6 +484,7 @@ class OnboardingController {
       });
     }
   }
+
 }
 
 module.exports = OnboardingController;

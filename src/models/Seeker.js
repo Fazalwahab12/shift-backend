@@ -1,57 +1,74 @@
 const { databaseService, COLLECTIONS } = require('../config/database');
 
 /**
- * Job Seeker Profile Model
+ * Job Seeker Profile Model - Professional Implementation
+ * Matches frontend seeker profile steps exactly with enterprise-grade features
  */
 class Seeker {
   constructor(data = {}) {
     this.id = data.id || null;
     this.userId = data.userId || null;
     
-    // Personal Information (Step 1)
-    this.firstName = data.firstName || null;
-    this.lastName = data.lastName || null;
+    // STEP 1: Personal Information
+    this.fullName = data.fullName || null;
+    this.idNumber = data.idNumber || null; // Oman Civil ID
+    this.dateOfBirth = data.dateOfBirth || null; // Format: "3 July 1984"
+    this.gender = data.gender || null; // 'Male', 'Female'
+    this.mobileNumber = data.mobileNumber || null; // +968-XXXXXXXX
     this.email = data.email || null;
-    this.dateOfBirth = data.dateOfBirth || null;
-    this.gender = data.gender || null; // 'male', 'female', 'other'
-    this.nationality = data.nationality || 'Omani';
-    this.profilePhoto = data.profilePhoto || null;
+    this.profilePhoto = data.profilePhoto || null; // Upload photo URL
+    this.bio = data.bio || null; // Multi-line bio text
+    this.educationalLevel = data.educationalLevel || null; // 'High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'
     
-    // Location Information (Step 2)
-    this.address = data.address || {};
-    this.wilayat = data.wilayat || null; // Oman administrative division
-    this.governorate = data.governorate || null;
-    this.preferredWorkLocation = data.preferredWorkLocation || [];
-    this.transportationAvailable = data.transportationAvailable || false;
+    // VIDEO MANAGEMENT SYSTEM
+    this.profileVideo = data.profileVideo || null; // Final video URL (set by admin)
+    this.videoStatus = data.videoStatus || 'pending'; // 'pending', 'scheduled', 'recorded', 'published', 'rejected'
+    this.videoRequestedAt = data.videoRequestedAt || null; // When user requested video
+    this.videoScheduledAt = data.videoScheduledAt || null; // When admin scheduled recording
+    this.videoRecordedAt = data.videoRecordedAt || null; // When admin recorded video
+    this.videoPublishedAt = data.videoPublishedAt || null; // When admin published video
+    this.videoNotes = data.videoNotes || null; // Admin notes about video
+    this.videoRecordingLocation = data.videoRecordingLocation || null; // Office location for recording
+    this.whatsappContactRequested = data.whatsappContactRequested || false; // User clicked WhatsApp contact
     
-    // Professional Information (Step 3)
-    this.experienceLevel = data.experienceLevel || null; // 'entry', 'intermediate', 'senior'
-    this.industries = data.industries || []; // Array of industry preferences
-    this.roles = data.roles || []; // Array of role preferences
-    this.skills = data.skills || [];
-    this.languages = data.languages || []; // Array of {language, proficiency}
+    // STEP 2: Professional Information
+    this.industries = data.industries || []; // ['Retail', 'Hospitality', 'F&B', 'Technology', etc.]
+    this.roles = data.roles || []; // ['Barista', 'Sales', 'Cashier', 'Manager', etc.]
+    this.yearsOfExperience = data.yearsOfExperience || null; // Number as string
+    this.skills = data.skills || []; // ['Customer Service', 'Cashier', 'Communication', etc.]
+    this.previousWorkplaces = data.previousWorkplaces || []; // ['McDonald\'s', 'Zara Oman', etc.]
+    this.certificates = data.certificates || null; // Multi-line certificates text
     
-    // Education (Step 4)
-    this.education = data.education || []; // Array of education records
-    this.certifications = data.certifications || [];
+    // STEP 3: Availability & Preferences  
+    this.availability = data.availability || null; // 'Public Holidays', 'Both', 'Weekends'
+    this.currentStatus = data.currentStatus || null; // 'Student', 'Graduate', 'Working', 'Unemployed', 'Other'
+    this.workType = data.workType || null; // 'Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'
+    this.preferredLocations = data.preferredLocations || []; // ['Seeb', 'Barka', 'Muscat', etc.]
+    this.languages = data.languages || []; // ['Arabic', 'English', 'Hindi', etc.] - multiple selection
+    this.retailAcademyTrained = data.retailAcademyTrained || null; // 'Yes', 'No'
     
-    // Work Preferences (Step 5)
-    this.employmentType = data.employmentType || []; // 'full-time', 'part-time', 'contract', 'shift'
-    this.availabilityShifts = data.availabilityShifts || {}; // {morning: true, afternoon: false, night: true}
-    this.availableDays = data.availableDays || {}; // {monday: true, tuesday: false, ...}
-    this.expectedSalary = data.expectedSalary || {};
-    this.immediateAvailability = data.immediateAvailability || false;
-    this.availableStartDate = data.availableStartDate || null;
+    // STEP 4: Terms & Conditions
+    this.acceptedTerms = data.acceptedTerms || false; // Boolean - must be true
+    this.acceptedAt = data.acceptedAt || null; // Timestamp when terms accepted
     
-    // CV and Documents
-    this.cvFile = data.cvFile || null;
-    this.documents = data.documents || []; // Array of document URLs
+    // STEP 5: Profile Preview & Confirmation
+    this.profileConfirmed = data.profileConfirmed || false; // Final confirmation
+    this.confirmedAt = data.confirmedAt || null; // Timestamp when profile confirmed
     
-    // Profile Status
-    this.profileCompletionStep = data.profileCompletionStep || 1;
+    // Profile Management
+    this.profileCompletionStep = data.profileCompletionStep || 1; // 1-5 steps
     this.isProfileComplete = data.isProfileComplete || false;
-    this.isVerified = data.isVerified || false;
+    this.profileCompletionPercentage = data.profileCompletionPercentage || 0;
+    
+    // System Fields
     this.isActive = data.isActive !== undefined ? data.isActive : true;
+    this.isVerified = data.isVerified || false;
+    this.lastLoginAt = data.lastLoginAt || null;
+    this.activityScore = data.activityScore || 100; // Initial score: 100
+    this.strikeCount = data.strikeCount || 0; // Strike system for no-shows
+    this.suspendedUntil = data.suspendedUntil || null; // Suspension end date
+    this.isSuspended = data.isSuspended || false;
+    this.isPermanentlyBanned = data.isPermanentlyBanned || false;
     
     // Metadata
     this.createdAt = data.createdAt || null;
@@ -84,10 +101,12 @@ class Seeker {
       // Inherit data from onboarding
       const profileData = {
         userId: userId,
-        experienceLevel: onboardingData.experienceLevel,
-        industries: onboardingData.selectedIndustries,
-        roles: onboardingData.selectedRoles,
-        ...seekerData
+        industries: onboardingData.selectedIndustries || [],
+        roles: onboardingData.selectedRoles || [],
+        ...seekerData,
+        profileCompletionStep: 1,
+        activityScore: 100,
+        isActive: true
       };
 
       const seeker = new Seeker(profileData);
@@ -147,19 +166,32 @@ class Seeker {
   }
 
   /**
-   * Update profile step
+   * Update profile step with comprehensive validation
    */
   async updateProfileStep(step, stepData) {
     try {
       const updateData = {
         profileCompletionStep: Math.max(this.profileCompletionStep, step),
+        updatedAt: new Date().toISOString(),
         ...stepData
       };
 
-      // Mark profile as complete if step 5 is reached
-      if (step >= 5) {
-        updateData.isProfileComplete = true;
+      // Step-specific logic
+      if (step === 4 && stepData.acceptedTerms) {
+        updateData.acceptedAt = new Date().toISOString();
       }
+      
+      if (step === 5 && stepData.profileConfirmed) {
+        updateData.confirmedAt = new Date().toISOString();
+        updateData.isProfileComplete = true;
+        updateData.profileCompletionPercentage = 100;
+      }
+
+      // Calculate completion percentage
+      updateData.profileCompletionPercentage = this.calculateCompletionPercentage({
+        ...this.toJSON(),
+        ...updateData
+      });
 
       return await this.update(updateData);
     } catch (error) {
@@ -169,7 +201,275 @@ class Seeker {
   }
 
   /**
-   * Search seekers by criteria
+   * Calculate profile completion percentage based on required fields per step
+   */
+  calculateCompletionPercentage(data = null) {
+    const seekerData = data || this;
+    let totalFields = 0;
+    let completedFields = 0;
+
+    // Step 1: Personal Information (10 fields)
+    const step1Fields = ['fullName', 'idNumber', 'dateOfBirth', 'gender', 'mobileNumber', 'email', 'profilePhoto', 'bio', 'educationalLevel'];
+    totalFields += step1Fields.length;
+    step1Fields.forEach(field => {
+      if (seekerData[field]) completedFields++;
+    });
+
+    // Step 2: Professional Information (6 fields)  
+    const step2Fields = ['industries', 'roles', 'yearsOfExperience', 'skills', 'previousWorkplaces'];
+    totalFields += step2Fields.length;
+    step2Fields.forEach(field => {
+      if (seekerData[field] && (Array.isArray(seekerData[field]) ? seekerData[field].length > 0 : seekerData[field])) {
+        completedFields++;
+      }
+    });
+
+    // Step 3: Availability & Preferences (6 fields)
+    const step3Fields = ['availability', 'currentStatus', 'workType', 'preferredLocations', 'languages', 'retailAcademyTrained'];
+    totalFields += step3Fields.length;
+    step3Fields.forEach(field => {
+      if (seekerData[field] && (Array.isArray(seekerData[field]) ? seekerData[field].length > 0 : seekerData[field])) {
+        completedFields++;
+      }
+    });
+
+    // Step 4: Terms & Conditions (1 field)
+    totalFields += 1;
+    if (seekerData.acceptedTerms) completedFields++;
+
+    // Step 5: Profile Confirmation (1 field)
+    totalFields += 1;
+    if (seekerData.profileConfirmed) completedFields++;
+
+    return Math.round((completedFields / totalFields) * 100);
+  }
+
+  /**
+   * Add strike for no-show or unprofessional behavior
+   */
+  async addStrike(reason = 'No-show') {
+    try {
+      const newStrikeCount = this.strikeCount + 1;
+      const updateData = {
+        strikeCount: newStrikeCount,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Apply consequences based on strike count
+      if (newStrikeCount === 2) {
+        // 30-day suspension
+        const suspendUntil = new Date();
+        suspendUntil.setDate(suspendUntil.getDate() + 30);
+        updateData.isSuspended = true;
+        updateData.suspendedUntil = suspendUntil.toISOString();
+        updateData.activityScore = Math.max(0, this.activityScore - 30);
+      } else if (newStrikeCount >= 3) {
+        // Permanent ban
+        updateData.isPermanentlyBanned = true;
+        updateData.isActive = false;
+        updateData.activityScore = 0;
+      } else {
+        // Reduce activity score
+        updateData.activityScore = Math.max(0, this.activityScore - 15);
+      }
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error adding strike:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update activity score based on platform engagement
+   */
+  async updateActivityScore(scoreChange) {
+    try {
+      const newScore = Math.max(0, Math.min(100, this.activityScore + scoreChange));
+      return await this.update({ 
+        activityScore: newScore,
+        lastLoginAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating activity score:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if seeker is available for jobs
+   */
+  isAvailableForJobs() {
+    return this.isActive && 
+           !this.isSuspended && 
+           !this.isPermanentlyBanned && 
+           this.isProfileComplete &&
+           this.acceptedTerms &&
+           this.profileConfirmed;
+  }
+
+  /**
+   * Get seeker status for display
+   */
+  getStatus() {
+    if (this.isPermanentlyBanned) return 'banned';
+    if (this.isSuspended) return 'suspended';
+    if (!this.isProfileComplete) return 'incomplete';
+    if (!this.isActive) return 'inactive';
+    if (this.activityScore < 30) return 'low_activity';
+    return 'active';
+  }
+
+  /**
+   * Request video recording via WhatsApp contact
+   */
+  async requestVideoRecording() {
+    try {
+      const updateData = {
+        whatsappContactRequested: true,
+        videoRequestedAt: new Date().toISOString(),
+        videoStatus: 'pending',
+        updatedAt: new Date().toISOString()
+      };
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error requesting video recording:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Schedule video recording
+   */
+  async scheduleVideoRecording(scheduledDate, location, adminNotes = null) {
+    try {
+      const updateData = {
+        videoStatus: 'scheduled',
+        videoScheduledAt: scheduledDate,
+        videoRecordingLocation: location,
+        videoNotes: adminNotes,
+        updatedAt: new Date().toISOString()
+      };
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error scheduling video recording:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Mark video as recorded
+   */
+  async markVideoRecorded(adminNotes = null) {
+    try {
+      const updateData = {
+        videoStatus: 'recorded',
+        videoRecordedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (adminNotes) {
+        updateData.videoNotes = adminNotes;
+      }
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error marking video as recorded:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Publish video and make it live
+   */
+  async publishVideo(videoUrl, adminNotes = null) {
+    try {
+      const updateData = {
+        profileVideo: videoUrl,
+        videoStatus: 'published',
+        videoPublishedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (adminNotes) {
+        updateData.videoNotes = adminNotes;
+      }
+
+      // Increase activity score for having a video
+      updateData.activityScore = Math.min(100, this.activityScore + 10);
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error publishing video:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Reject video request
+   */
+  async rejectVideoRequest(reason) {
+    try {
+      const updateData = {
+        videoStatus: 'rejected',
+        videoNotes: reason,
+        updatedAt: new Date().toISOString()
+      };
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error rejecting video request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get video workflow status
+   */
+  getVideoWorkflowStatus() {
+    return {
+      status: this.videoStatus,
+      hasVideo: !!this.profileVideo,
+      canRequestVideo: !this.whatsappContactRequested && this.videoStatus === 'pending',
+      statusMessage: this.getVideoStatusMessage(),
+      timeline: {
+        requested: this.videoRequestedAt,
+        scheduled: this.videoScheduledAt,
+        recorded: this.videoRecordedAt,
+        published: this.videoPublishedAt
+      },
+      location: this.videoRecordingLocation,
+      notes: this.videoNotes
+    };
+  }
+
+  /**
+   * Get human-readable video status message
+   */
+  getVideoStatusMessage() {
+    switch (this.videoStatus) {
+      case 'pending':
+        return this.whatsappContactRequested 
+          ? 'Video request sent. Admin will contact you to schedule recording.'
+          : 'Click "Contact via WhatsApp" to request your profile video.';
+      case 'scheduled':
+        return `Video recording scheduled. Please visit ${this.videoRecordingLocation} on the scheduled date.`;
+      case 'recorded':
+        return 'Video has been recorded and is being processed for publication.';
+      case 'published':
+        return 'Your profile video is now live!';
+      case 'rejected':
+        return `Video request was rejected. Reason: ${this.videoNotes || 'Please contact admin for details.'}`;
+      default:
+        return 'Video status unknown.';
+    }
+  }
+
+  /**
+   * Search seekers by criteria with advanced filtering
    */
   static async search(searchCriteria = {}) {
     try {
@@ -184,26 +484,53 @@ class Seeker {
         filters.push({ field: 'roles', operator: 'array-contains-any', value: searchCriteria.roles });
       }
       
-      if (searchCriteria.experienceLevel) {
-        filters.push({ field: 'experienceLevel', operator: '==', value: searchCriteria.experienceLevel });
+      if (searchCriteria.skills && searchCriteria.skills.length > 0) {
+        filters.push({ field: 'skills', operator: 'array-contains-any', value: searchCriteria.skills });
       }
       
-      if (searchCriteria.governorate) {
-        filters.push({ field: 'governorate', operator: '==', value: searchCriteria.governorate });
+      if (searchCriteria.preferredLocations && searchCriteria.preferredLocations.length > 0) {
+        filters.push({ field: 'preferredLocations', operator: 'array-contains-any', value: searchCriteria.preferredLocations });
       }
 
-      // Only show active and complete profiles
+      if (searchCriteria.languages && searchCriteria.languages.length > 0) {
+        filters.push({ field: 'languages', operator: 'array-contains-any', value: searchCriteria.languages });
+      }
+
+      if (searchCriteria.availability) {
+        filters.push({ field: 'availability', operator: '==', value: searchCriteria.availability });
+      }
+
+      if (searchCriteria.workType) {
+        filters.push({ field: 'workType', operator: '==', value: searchCriteria.workType });
+      }
+
+      if (searchCriteria.retailAcademyTrained) {
+        filters.push({ field: 'retailAcademyTrained', operator: '==', value: searchCriteria.retailAcademyTrained });
+      }
+
+      // Activity score filter for quality candidates
+      if (searchCriteria.minActivityScore) {
+        filters.push({ field: 'activityScore', operator: '>=', value: searchCriteria.minActivityScore });
+      }
+
+      // Only show available seekers
       filters.push({ field: 'isActive', operator: '==', value: true });
       filters.push({ field: 'isProfileComplete', operator: '==', value: true });
+      filters.push({ field: 'acceptedTerms', operator: '==', value: true });
+      filters.push({ field: 'profileConfirmed', operator: '==', value: true });
+      filters.push({ field: 'isSuspended', operator: '==', value: false });
+      filters.push({ field: 'isPermanentlyBanned', operator: '==', value: false });
 
       const seekers = await databaseService.query(
         COLLECTIONS.SEEKERS,
         filters,
-        { field: 'updatedAt', direction: 'desc' },
+        null, // No ordering to avoid composite index issues
         searchCriteria.limit || 50
       );
 
-      return seekers.map(seekerData => new Seeker(seekerData));
+      // Sort by activity score in JavaScript
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      return seekerInstances.sort((a, b) => b.activityScore - a.activityScore);
     } catch (error) {
       console.error('Error searching seekers:', error);
       throw error;
@@ -211,19 +538,23 @@ class Seeker {
   }
 
   /**
-   * Get seekers by location
+   * Get seekers by preferred locations
    */
-  static async getByLocation(governorate, limit = 20) {
+  static async getByLocation(location, limit = 20) {
     try {
       const seekers = await databaseService.query(COLLECTIONS.SEEKERS, [
-        { field: 'governorate', operator: '==', value: governorate },
+        { field: 'preferredLocations', operator: 'array-contains', value: location },
         { field: 'isActive', operator: '==', value: true },
-        { field: 'isProfileComplete', operator: '==', value: true }
+        { field: 'isProfileComplete', operator: '==', value: true },
+        { field: 'isSuspended', operator: '==', value: false },
+        { field: 'isPermanentlyBanned', operator: '==', value: false }
       ], 
-      { field: 'updatedAt', direction: 'desc' },
+      null, // No ordering to avoid composite index issues
       limit);
 
-      return seekers.map(seekerData => new Seeker(seekerData));
+      // Sort by activity score in JavaScript
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      return seekerInstances.sort((a, b) => b.activityScore - a.activityScore);
     } catch (error) {
       console.error('Error getting seekers by location:', error);
       throw error;
@@ -231,22 +562,125 @@ class Seeker {
   }
 
   /**
-   * Calculate profile completion percentage
+   * Get high-performing seekers (activity score >= 70)
+   */
+  static async getHighPerformers(limit = 20) {
+    try {
+      const seekers = await databaseService.query(COLLECTIONS.SEEKERS, [
+        { field: 'activityScore', operator: '>=', value: 70 },
+        { field: 'isActive', operator: '==', value: true },
+        { field: 'isProfileComplete', operator: '==', value: true },
+        { field: 'isSuspended', operator: '==', value: false },
+        { field: 'isPermanentlyBanned', operator: '==', value: false }
+      ], null, limit);
+
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      return seekerInstances.sort((a, b) => b.activityScore - a.activityScore);
+    } catch (error) {
+      console.error('Error getting high performers:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Get seekers pending video requests
+   */
+  static async getVideoPendingRequests(limit = 50) {
+    try {
+      const seekers = await databaseService.query(COLLECTIONS.SEEKERS, [
+        { field: 'whatsappContactRequested', operator: '==', value: true },
+        { field: 'videoStatus', operator: '==', value: 'pending' },
+        { field: 'isActive', operator: '==', value: true }
+      ], null, limit);
+
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      // Sort by request date (most recent first)
+      return seekerInstances.sort((a, b) => 
+        new Date(b.videoRequestedAt) - new Date(a.videoRequestedAt)
+      );
+    } catch (error) {
+      console.error('Error getting video pending requests:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Get seekers with scheduled video recordings
+   */
+  static async getScheduledVideoRecordings(limit = 50) {
+    try {
+      const seekers = await databaseService.query(COLLECTIONS.SEEKERS, [
+        { field: 'videoStatus', operator: '==', value: 'scheduled' },
+        { field: 'isActive', operator: '==', value: true }
+      ], null, limit);
+
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      // Sort by scheduled date
+      return seekerInstances.sort((a, b) => 
+        new Date(a.videoScheduledAt) - new Date(b.videoScheduledAt)
+      );
+    } catch (error) {
+      console.error('Error getting scheduled video recordings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Get seekers with recorded videos pending publication
+   */
+  static async getRecordedVideosPendingPublication(limit = 50) {
+    try {
+      const seekers = await databaseService.query(COLLECTIONS.SEEKERS, [
+        { field: 'videoStatus', operator: '==', value: 'recorded' },
+        { field: 'isActive', operator: '==', value: true }
+      ], null, limit);
+
+      const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
+      // Sort by recorded date (oldest first - prioritize older recordings)
+      return seekerInstances.sort((a, b) => 
+        new Date(a.videoRecordedAt) - new Date(b.videoRecordedAt)
+      );
+    } catch (error) {
+      console.error('Error getting recorded videos pending publication:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ADMIN: Get video workflow statistics
+   */
+  static async getVideoWorkflowStats() {
+    try {
+      const allSeekers = await databaseService.query(COLLECTIONS.SEEKERS, [
+        { field: 'isActive', operator: '==', value: true }
+      ], null, 1000);
+
+      const stats = {
+        total: allSeekers.length,
+        pending: allSeekers.filter(s => s.videoStatus === 'pending' && s.whatsappContactRequested).length,
+        scheduled: allSeekers.filter(s => s.videoStatus === 'scheduled').length,
+        recorded: allSeekers.filter(s => s.videoStatus === 'recorded').length,
+        published: allSeekers.filter(s => s.videoStatus === 'published').length,
+        rejected: allSeekers.filter(s => s.videoStatus === 'rejected').length,
+        noVideoRequested: allSeekers.filter(s => !s.whatsappContactRequested).length
+      };
+
+      stats.completionRate = stats.total > 0 
+        ? Math.round((stats.published / stats.total) * 100) 
+        : 0;
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting video workflow stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get profile completion percentage (uses the calculation method)
    */
   getProfileCompletionPercentage() {
-    const requiredFields = [
-      'firstName', 'lastName', 'email', 'dateOfBirth', 'gender',
-      'governorate', 'experienceLevel', 'industries', 'roles'
-    ];
-    
-    let completedFields = 0;
-    requiredFields.forEach(field => {
-      if (this[field] && (Array.isArray(this[field]) ? this[field].length > 0 : true)) {
-        completedFields++;
-      }
-    });
-    
-    return Math.round((completedFields / requiredFields.length) * 100);
+    return this.calculateCompletionPercentage();
   }
 
   /**
@@ -255,37 +689,67 @@ class Seeker {
   toJSON() {
     return {
       userId: this.userId,
-      firstName: this.firstName,
-      lastName: this.lastName,
-      email: this.email,
+      
+      // Step 1: Personal Information
+      fullName: this.fullName,
+      idNumber: this.idNumber,
       dateOfBirth: this.dateOfBirth,
       gender: this.gender,
-      nationality: this.nationality,
+      mobileNumber: this.mobileNumber,
+      email: this.email,
       profilePhoto: this.profilePhoto,
-      address: this.address,
-      wilayat: this.wilayat,
-      governorate: this.governorate,
-      preferredWorkLocation: this.preferredWorkLocation,
-      transportationAvailable: this.transportationAvailable,
-      experienceLevel: this.experienceLevel,
+      bio: this.bio,
+      educationalLevel: this.educationalLevel,
+      
+      // Video Management System
+      profileVideo: this.profileVideo,
+      videoStatus: this.videoStatus,
+      videoRequestedAt: this.videoRequestedAt,
+      videoScheduledAt: this.videoScheduledAt,
+      videoRecordedAt: this.videoRecordedAt,
+      videoPublishedAt: this.videoPublishedAt,
+      videoNotes: this.videoNotes,
+      videoRecordingLocation: this.videoRecordingLocation,
+      whatsappContactRequested: this.whatsappContactRequested,
+      
+      // Step 2: Professional Information
       industries: this.industries,
       roles: this.roles,
+      yearsOfExperience: this.yearsOfExperience,
       skills: this.skills,
+      previousWorkplaces: this.previousWorkplaces,
+      certificates: this.certificates,
+      
+      // Step 3: Availability & Preferences
+      availability: this.availability,
+      currentStatus: this.currentStatus,
+      workType: this.workType,
+      preferredLocations: this.preferredLocations,
       languages: this.languages,
-      education: this.education,
-      certifications: this.certifications,
-      employmentType: this.employmentType,
-      availabilityShifts: this.availabilityShifts,
-      availableDays: this.availableDays,
-      expectedSalary: this.expectedSalary,
-      immediateAvailability: this.immediateAvailability,
-      availableStartDate: this.availableStartDate,
-      cvFile: this.cvFile,
-      documents: this.documents,
+      retailAcademyTrained: this.retailAcademyTrained,
+      
+      // Step 4: Terms & Conditions
+      acceptedTerms: this.acceptedTerms,
+      acceptedAt: this.acceptedAt,
+      
+      // Step 5: Profile Confirmation
+      profileConfirmed: this.profileConfirmed,
+      confirmedAt: this.confirmedAt,
+      
+      // Profile Management
       profileCompletionStep: this.profileCompletionStep,
       isProfileComplete: this.isProfileComplete,
+      profileCompletionPercentage: this.profileCompletionPercentage,
+      
+      // System Fields
+      isActive: this.isActive,
       isVerified: this.isVerified,
-      isActive: this.isActive
+      lastLoginAt: this.lastLoginAt,
+      activityScore: this.activityScore,
+      strikeCount: this.strikeCount,
+      suspendedUntil: this.suspendedUntil,
+      isSuspended: this.isSuspended,
+      isPermanentlyBanned: this.isPermanentlyBanned
     };
   }
 
@@ -295,20 +759,100 @@ class Seeker {
   toPublicJSON() {
     return {
       id: this.id,
-      firstName: this.firstName,
-      lastName: this.lastName,
+      userId: this.userId,
+      
+      // Personal Information (safe fields only)
+      fullName: this.fullName,
       profilePhoto: this.profilePhoto,
-      governorate: this.governorate,
-      experienceLevel: this.experienceLevel,
+      profileVideo: this.profileVideo, // Only show if published
+      bio: this.bio,
+      educationalLevel: this.educationalLevel,
+      videoWorkflow: this.getVideoWorkflowStatus(), // Include video workflow status
+      
+      // Professional Information
       industries: this.industries,
       roles: this.roles,
+      yearsOfExperience: this.yearsOfExperience,
       skills: this.skills,
+      previousWorkplaces: this.previousWorkplaces,
+      
+      // Availability & Preferences
+      availability: this.availability,
+      workType: this.workType,
+      preferredLocations: this.preferredLocations,
       languages: this.languages,
-      employmentType: this.employmentType,
-      availabilityShifts: this.availabilityShifts,
+      retailAcademyTrained: this.retailAcademyTrained,
+      
+      // Status Information
       isVerified: this.isVerified,
+      activityScore: this.activityScore,
+      status: this.getStatus(),
       profileCompletionPercentage: this.getProfileCompletionPercentage(),
-      createdAt: this.createdAt
+      isAvailableForJobs: this.isAvailableForJobs(),
+      
+      // Timestamps
+      createdAt: this.createdAt,
+      lastLoginAt: this.lastLoginAt
+    };
+  }
+
+  /**
+   * Convert to detailed JSON for profile management
+   */
+  toDetailedJSON() {
+    return {
+      id: this.id,
+      userId: this.userId,
+      
+      // Complete personal information
+      fullName: this.fullName,
+      idNumber: this.idNumber,
+      dateOfBirth: this.dateOfBirth,
+      gender: this.gender,
+      mobileNumber: this.mobileNumber,
+      email: this.email,
+      profilePhoto: this.profilePhoto,
+      profileVideo: this.profileVideo,
+      bio: this.bio,
+      educationalLevel: this.educationalLevel,
+      
+      // Complete professional information
+      industries: this.industries,
+      roles: this.roles,
+      yearsOfExperience: this.yearsOfExperience,
+      skills: this.skills,
+      previousWorkplaces: this.previousWorkplaces,
+      certificates: this.certificates,
+      
+      // Complete availability & preferences
+      availability: this.availability,
+      currentStatus: this.currentStatus,
+      workType: this.workType,
+      preferredLocations: this.preferredLocations,
+      languages: this.languages,
+      retailAcademyTrained: this.retailAcademyTrained,
+      
+      // Profile completion status
+      profileCompletionStep: this.profileCompletionStep,
+      isProfileComplete: this.isProfileComplete,
+      profileCompletionPercentage: this.getProfileCompletionPercentage(),
+      acceptedTerms: this.acceptedTerms,
+      profileConfirmed: this.profileConfirmed,
+      
+      // System information
+      isActive: this.isActive,
+      isVerified: this.isVerified,
+      activityScore: this.activityScore,
+      strikeCount: this.strikeCount,
+      status: this.getStatus(),
+      isAvailableForJobs: this.isAvailableForJobs(),
+      
+      // Timestamps
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      lastLoginAt: this.lastLoginAt,
+      acceptedAt: this.acceptedAt,
+      confirmedAt: this.confirmedAt
     };
   }
 }

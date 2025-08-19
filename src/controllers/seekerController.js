@@ -260,10 +260,14 @@ class SeekerController {
       const {
         industries,
         roles,
-        experienceLevel,
-        governorate,
-        limit,
-        page
+        skills,
+        preferredLocations,
+        languages,
+        availability,
+        workType,
+        retailAcademyTrained,
+        minActivityScore,
+        limit
       } = req.query;
 
       const searchCriteria = {};
@@ -276,12 +280,32 @@ class SeekerController {
         searchCriteria.roles = Array.isArray(roles) ? roles : roles.split(',');
       }
       
-      if (experienceLevel) {
-        searchCriteria.experienceLevel = experienceLevel;
+      if (skills) {
+        searchCriteria.skills = Array.isArray(skills) ? skills : skills.split(',');
       }
       
-      if (governorate) {
-        searchCriteria.governorate = governorate;
+      if (preferredLocations) {
+        searchCriteria.preferredLocations = Array.isArray(preferredLocations) ? preferredLocations : preferredLocations.split(',');
+      }
+      
+      if (languages) {
+        searchCriteria.languages = Array.isArray(languages) ? languages : languages.split(',');
+      }
+      
+      if (availability) {
+        searchCriteria.availability = availability;
+      }
+      
+      if (workType) {
+        searchCriteria.workType = workType;
+      }
+      
+      if (retailAcademyTrained) {
+        searchCriteria.retailAcademyTrained = retailAcademyTrained;
+      }
+      
+      if (minActivityScore) {
+        searchCriteria.minActivityScore = parseInt(minActivityScore);
       }
       
       if (limit) {
@@ -312,15 +336,15 @@ class SeekerController {
 
   /**
    * Get seekers by location
-   * GET /api/seekers/location/:governorate
+   * GET /api/seekers/location/:location
    */
   static async getSeekersByLocation(req, res) {
     try {
-      const { governorate } = req.params;
+      const { location } = req.params;
       const { limit } = req.query;
 
       const seekers = await Seeker.getByLocation(
-        governorate, 
+        location, 
         limit ? parseInt(limit) : 20
       );
 
@@ -329,7 +353,7 @@ class SeekerController {
         message: 'Seekers by location retrieved successfully',
         data: {
           seekers: seekers.map(seeker => seeker.toPublicJSON()),
-          governorate,
+          location,
           count: seekers.length
         }
       });
@@ -370,16 +394,31 @@ class SeekerController {
           profileCompletionStep: seeker.profileCompletionStep,
           isProfileComplete: seeker.isProfileComplete,
           completionPercentage,
+          status: seeker.getStatus(),
+          isAvailableForJobs: seeker.isAvailableForJobs(),
           missingFields: completionPercentage < 100 ? [
-            !seeker.firstName && 'firstName',
-            !seeker.lastName && 'lastName',
-            !seeker.email && 'email',
+            !seeker.fullName && 'fullName',
+            !seeker.idNumber && 'idNumber',
             !seeker.dateOfBirth && 'dateOfBirth',
             !seeker.gender && 'gender',
-            !seeker.governorate && 'governorate',
-            !seeker.experienceLevel && 'experienceLevel',
+            !seeker.mobileNumber && 'mobileNumber',
+            !seeker.email && 'email',
+            !seeker.profilePhoto && 'profilePhoto',
+            !seeker.bio && 'bio',
+            !seeker.educationalLevel && 'educationalLevel',
             (!seeker.industries || seeker.industries.length === 0) && 'industries',
-            (!seeker.roles || seeker.roles.length === 0) && 'roles'
+            (!seeker.roles || seeker.roles.length === 0) && 'roles',
+            !seeker.yearsOfExperience && 'yearsOfExperience',
+            (!seeker.skills || seeker.skills.length === 0) && 'skills',
+            (!seeker.previousWorkplaces || seeker.previousWorkplaces.length === 0) && 'previousWorkplaces',
+            !seeker.availability && 'availability',
+            !seeker.currentStatus && 'currentStatus',
+            !seeker.workType && 'workType',
+            (!seeker.preferredLocations || seeker.preferredLocations.length === 0) && 'preferredLocations',
+            (!seeker.languages || seeker.languages.length === 0) && 'languages',
+            !seeker.retailAcademyTrained && 'retailAcademyTrained',
+            !seeker.acceptedTerms && 'acceptedTerms',
+            !seeker.profileConfirmed && 'profileConfirmed'
           ].filter(Boolean) : []
         }
       });
@@ -498,6 +537,431 @@ class SeekerController {
 
     } catch (error) {
       console.error('Error in deleteProfile:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Request video recording
+   * POST /api/seekers/:seekerId/request-video
+   */
+  static async requestVideoRecording(req, res) {
+    try {
+      const { seekerId } = req.params;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.requestVideoRecording();
+
+      res.status(200).json({
+        success: true,
+        message: 'Video recording request submitted successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in requestVideoRecording:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Schedule video recording (Admin only)
+   * POST /api/seekers/:seekerId/schedule-video
+   */
+  static async scheduleVideoRecording(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { scheduledDate, location, adminNotes } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.scheduleVideoRecording(scheduledDate, location, adminNotes);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video recording scheduled successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in scheduleVideoRecording:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Mark video as recorded (Admin only)
+   * POST /api/seekers/:seekerId/mark-video-recorded
+   */
+  static async markVideoRecorded(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { adminNotes } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.markVideoRecorded(adminNotes);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video marked as recorded successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in markVideoRecorded:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Publish video (Admin only)
+   * POST /api/seekers/:seekerId/publish-video
+   */
+  static async publishVideo(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { videoUrl, adminNotes } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.publishVideo(videoUrl, adminNotes);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video published successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in publishVideo:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Reject video request (Admin only)
+   * POST /api/seekers/:seekerId/reject-video
+   */
+  static async rejectVideoRequest(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { reason } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.rejectVideoRequest(reason);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video request rejected successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in rejectVideoRequest:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get video workflow status
+   * GET /api/seekers/:seekerId/video-status
+   */
+  static async getVideoStatus(req, res) {
+    try {
+      const { seekerId } = req.params;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Video workflow status retrieved successfully',
+        data: seeker.getVideoWorkflowStatus()
+      });
+
+    } catch (error) {
+      console.error('Error in getVideoStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Add strike for no-show (Admin only)
+   * POST /api/seekers/:seekerId/add-strike
+   */
+  static async addStrike(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { reason } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.addStrike(reason);
+
+      res.status(200).json({
+        success: true,
+        message: 'Strike added successfully',
+        data: {
+          seekerId: seeker.id,
+          strikeCount: seeker.strikeCount,
+          status: seeker.getStatus(),
+          activityScore: seeker.activityScore
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addStrike:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Update activity score
+   * POST /api/seekers/:seekerId/update-activity-score
+   */
+  static async updateActivityScore(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { scoreChange } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.updateActivityScore(scoreChange);
+
+      res.status(200).json({
+        success: true,
+        message: 'Activity score updated successfully',
+        data: {
+          seekerId: seeker.id,
+          activityScore: seeker.activityScore,
+          lastLoginAt: seeker.lastLoginAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in updateActivityScore:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get high-performing seekers
+   * GET /api/seekers/high-performers
+   */
+  static async getHighPerformers(req, res) {
+    try {
+      const { limit } = req.query;
+
+      const seekers = await Seeker.getHighPerformers(limit ? parseInt(limit) : 20);
+
+      res.status(200).json({
+        success: true,
+        message: 'High-performing seekers retrieved successfully',
+        data: {
+          seekers: seekers.map(seeker => seeker.toPublicJSON()),
+          count: seekers.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getHighPerformers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get seekers with pending video requests (Admin only)
+   * GET /api/seekers/admin/video-pending
+   */
+  static async getVideoPendingRequests(req, res) {
+    try {
+      const { limit } = req.query;
+
+      const seekers = await Seeker.getVideoPendingRequests(limit ? parseInt(limit) : 50);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video pending requests retrieved successfully',
+        data: {
+          seekers: seekers.map(seeker => seeker.toPublicJSON()),
+          count: seekers.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getVideoPendingRequests:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get seekers with scheduled video recordings (Admin only)
+   * GET /api/seekers/admin/video-scheduled
+   */
+  static async getScheduledVideoRecordings(req, res) {
+    try {
+      const { limit } = req.query;
+
+      const seekers = await Seeker.getScheduledVideoRecordings(limit ? parseInt(limit) : 50);
+
+      res.status(200).json({
+        success: true,
+        message: 'Scheduled video recordings retrieved successfully',
+        data: {
+          seekers: seekers.map(seeker => seeker.toPublicJSON()),
+          count: seekers.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getScheduledVideoRecordings:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get seekers with recorded videos pending publication (Admin only)
+   * GET /api/seekers/admin/video-recorded
+   */
+  static async getRecordedVideosPendingPublication(req, res) {
+    try {
+      const { limit } = req.query;
+
+      const seekers = await Seeker.getRecordedVideosPendingPublication(limit ? parseInt(limit) : 50);
+
+      res.status(200).json({
+        success: true,
+        message: 'Recorded videos pending publication retrieved successfully',
+        data: {
+          seekers: seekers.map(seeker => seeker.toPublicJSON()),
+          count: seekers.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getRecordedVideosPendingPublication:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get video workflow statistics (Admin only)
+   * GET /api/seekers/admin/video-stats
+   */
+  static async getVideoWorkflowStats(req, res) {
+    try {
+      const stats = await Seeker.getVideoWorkflowStats();
+
+      res.status(200).json({
+        success: true,
+        message: 'Video workflow statistics retrieved successfully',
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error in getVideoWorkflowStats:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

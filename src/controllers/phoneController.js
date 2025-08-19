@@ -316,24 +316,8 @@ class PhoneController {
     try {
       const { userType } = req.query;
 
-      const allUsers = await User.getAll(1, 1000, userType);
-      const verifiedUsers = allUsers.filter(user => user.isPhoneVerified);
-      const onboardedUsers = allUsers.filter(user => user.onboardingCompleted);
-      const completedProfiles = allUsers.filter(user => user.profileCompleted);
-
-      const stats = {
-        total: allUsers.length,
-        verified: verifiedUsers.length,
-        onboarded: onboardedUsers.length,
-        profilesCompleted: completedProfiles.length,
-        verificationRate: allUsers.length > 0 ? ((verifiedUsers.length / allUsers.length) * 100).toFixed(2) : 0,
-        onboardingRate: allUsers.length > 0 ? ((onboardedUsers.length / allUsers.length) * 100).toFixed(2) : 0,
-        completionRate: allUsers.length > 0 ? ((completedProfiles.length / allUsers.length) * 100).toFixed(2) : 0
-      };
-
-      if (userType) {
-        stats.userType = userType;
-      }
+      // Use the static method to get stats without complex queries
+      const stats = await User.getStats(userType);
 
       res.status(200).json({
         success: true,

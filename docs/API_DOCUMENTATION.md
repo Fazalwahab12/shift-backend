@@ -8,12 +8,11 @@ The Shift Backend API is a Node.js + Express + Firebase REST API designed for th
 
 The API follows this complete user flow:
 
-1. **Phone Registration** → Store phone number (+968 Oman-based)
-2. **OTP Verification** → Verify phone number (OTP provider integration ready)
-3. **User Type Selection** → Choose Seeker or Company
-4. **Onboarding** → Select industries, roles, and referral source
-5. **Profile Creation** → Complete detailed profile based on user type
-6. **Recommendations** → Use stored preferences for future job matching
+1. **Phone Registration** → Store phone number (+968 Oman-based) with user type selection
+2. **OTP Verification** → Verify phone number using Oman-based OTP provider integration
+3. **Key Preferences Setup** → Select industries, roles, shift preferences, and preferred social media
+4. **Profile Creation** → Complete detailed profile based on user type
+5. **Recommendations** → Use stored preferences for future job matching
 
 Each step builds upon the previous, creating a comprehensive user profile with industry/role preferences for recommendation engine.
 
@@ -205,17 +204,17 @@ GET /api/phone/stats?userType=seeker
 
 ---
 
-## Step 3: User Onboarding (Industry/Role Preferences)
+## Step 3: Key Preferences Setup (Industries, Roles, Shift Preferences, Social Media)
 
-### Complete Onboarding Flow
+### Complete Key Preferences Setup
 
-Create user preferences for future job recommendations.
+Create comprehensive user preferences including industries, roles, shift preferences, and social media for future job recommendations.
 
 ```http
 POST /api/onboarding
 ```
 
-**Purpose**: Collect industry/role preferences and referral data for recommendation engine.
+**Purpose**: Collect comprehensive user preferences including industries, roles, shift preferences, social media preferences, and referral data for intelligent job matching and recommendation engine.
 
 **Request Body (Seeker):**
 ```json
@@ -225,6 +224,8 @@ POST /api/onboarding
   "selectedIndustries": ["hospitality", "retail", "healthcare"],
   "selectedRoles": ["waiter", "cashier", "receptionist"],
   "experienceLevel": "intermediate",
+  "shiftPreferences": ["morning", "afternoon"],
+  "preferredSocialMedia": ["instagram", "whatsapp"],
   "referralSource": "social_media",
   "referralDetails": "Instagram ad campaign #2024"
 }
@@ -255,6 +256,8 @@ POST /api/onboarding
     "selectedIndustries": ["hospitality", "retail", "healthcare"],
     "selectedRoles": ["waiter", "cashier", "receptionist"],
     "experienceLevel": "intermediate",
+    "shiftPreferences": ["morning", "afternoon"],
+    "preferredSocialMedia": ["instagram", "whatsapp"],
     "referralSource": "social_media",
     "referralDetails": "Instagram ad campaign #2024",
     "isCompleted": true,
@@ -266,10 +269,12 @@ POST /api/onboarding
 ```
 
 **Notes**: 
-- Industry/role data used for future job matching
-- Referral tracking for analytics
+- Industry/role preferences used for intelligent job matching
+- Shift preferences enable better work-life balance matching
+- Social media preferences enable personalized communication channels
+- Referral tracking for analytics and user acquisition insights
 - Completion triggers profile creation flow
-- Data stored for recommendation engine
+- All preference data stored for advanced recommendation engine
 
 ### Get Onboarding Data
 
@@ -376,6 +381,69 @@ PUT /api/onboarding/{userId}/referral
   "referralSource": "friend_referral",
   "referralDetails": "Recommended by Ahmad"
 }
+```
+
+### Add Shift Preference
+
+Add a shift preference to user preferences.
+
+```http
+POST /api/onboarding/{userId}/shift-preference
+```
+
+**Request Body:**
+```json
+{
+  "shiftPreference": "morning"
+}
+```
+
+**Valid shift preferences:**
+- `morning` - Morning shift (6AM-2PM)
+- `afternoon` - Afternoon shift (2PM-10PM)
+- `evening` - Evening shift (6PM-2AM)
+- `night` - Night shift (10PM-6AM)
+- `flexible` - Flexible with any shift
+
+### Remove Shift Preference
+
+Remove a shift preference from user preferences.
+
+```http
+DELETE /api/onboarding/{userId}/shift-preference/{shiftPreference}
+```
+
+### Add Social Media Preference
+
+Add a preferred social media platform for communication.
+
+```http
+POST /api/onboarding/{userId}/social-media
+```
+
+**Request Body:**
+```json
+{
+  "socialMedia": "instagram"
+}
+```
+
+**Valid social media platforms:**
+- `instagram` - Instagram
+- `facebook` - Facebook
+- `twitter` - Twitter/X
+- `linkedin` - LinkedIn
+- `tiktok` - TikTok
+- `snapchat` - Snapchat
+- `whatsapp` - WhatsApp
+- `telegram` - Telegram
+
+### Remove Social Media Preference
+
+Remove a social media preference from user preferences.
+
+```http
+DELETE /api/onboarding/{userId}/social-media/{socialMedia}
 ```
 
 ### Onboarding Statistics

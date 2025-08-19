@@ -561,6 +561,692 @@ class CompanyController {
   }
 
   /**
+   * Update trial status
+   * PUT /api/companies/:companyId/trial-status
+   */
+  static async updateTrialStatus(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.updateTrialStatus();
+
+      res.status(200).json({
+        success: true,
+        message: 'Trial status updated successfully',
+        data: {
+          companyId: company.id,
+          trialDaysRemaining: company.trialDaysRemaining,
+          trialExpired: company.trialExpired,
+          subscriptionStatus: company.getSubscriptionStatus()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in updateTrialStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Add payment method
+   * POST /api/companies/:companyId/payment-methods
+   */
+  static async addPaymentMethod(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const paymentMethodData = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.addPaymentMethod(paymentMethodData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment method added successfully',
+        data: {
+          paymentMethods: company.paymentMethods,
+          defaultPaymentMethod: company.defaultPaymentMethod
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addPaymentMethod:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Purchase subscription
+   * POST /api/companies/:companyId/purchase-subscription
+   */
+  static async purchaseSubscription(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { planType, paymentMethodId, billingCycle = 'monthly' } = req.body;
+
+      if (!['starter', 'professional'].includes(planType)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid subscription plan type'
+        });
+      }
+
+      if (!['monthly', 'yearly'].includes(billingCycle)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid billing cycle'
+        });
+      }
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      if (!paymentMethodId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment method ID is required'
+        });
+      }
+
+      // Verify payment method exists
+      const paymentMethod = company.paymentMethods.find(pm => pm.id === paymentMethodId);
+      if (!paymentMethod) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment method not found'
+        });
+      }
+
+      await company.purchaseSubscription(planType, paymentMethodId, billingCycle);
+
+      res.status(200).json({
+        success: true,
+        message: 'Subscription purchased successfully',
+        data: {
+          subscriptionPlan: company.subscriptionPlan,
+          subscriptionStatus: company.subscriptionStatus,
+          nextBillingDate: company.nextBillingDate,
+          planLimits: company.planLimits
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in purchaseSubscription:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Process pay-as-you-go payment
+   * POST /api/companies/:companyId/payg-payment
+   */
+  static async processPAYGPayment(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { matches, interviewPackage, paymentMethodId } = req.body;
+
+      if (!matches || matches < 1) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid number of matches'
+        });
+      }
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      if (!paymentMethodId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment method ID is required'
+        });
+      }
+
+      // Verify payment method exists
+      const paymentMethod = company.paymentMethods.find(pm => pm.id === paymentMethodId);
+      if (!paymentMethod) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment method not found'
+        });
+      }
+
+      await company.processPAYGPayment(matches, interviewPackage, paymentMethodId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Pay-as-you-go payment processed successfully',
+        data: {
+          creditBalance: company.creditBalance,
+          usageStats: company.usageStats
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in processPAYGPayment:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Request custom plan
+   * POST /api/companies/:companyId/request-custom-plan
+   */
+  static async requestCustomPlan(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const planDetails = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.requestCustomPlan(planDetails);
+
+      res.status(200).json({
+        success: true,
+        message: 'Custom plan request submitted successfully',
+        data: {
+          customPlanRequested: company.customPlanRequested,
+          customPlanDetails: company.customPlanDetails
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in requestCustomPlan:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Contact admin
+   * POST /api/companies/:companyId/contact-admin
+   */
+  static async contactAdmin(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { message } = req.body;
+
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Message is required'
+        });
+      }
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.contactAdmin(message);
+
+      res.status(200).json({
+        success: true,
+        message: 'Admin contact request submitted successfully',
+        data: {
+          adminContactRequested: company.adminContactRequested,
+          adminNotes: company.adminNotes
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in contactAdmin:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Add team member
+   * POST /api/companies/:companyId/team-members
+   */
+  static async addTeamMember(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { email } = req.body;
+
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Valid email is required'
+        });
+      }
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Check if email already exists in team members
+      const existingMember = company.teamMembers.find(member => member.email === email);
+      if (existingMember) {
+        return res.status(409).json({
+          success: false,
+          message: 'Team member with this email already exists'
+        });
+      }
+
+      await company.addTeamMember(email);
+
+      res.status(200).json({
+        success: true,
+        message: 'Team member added successfully',
+        data: {
+          teamMembers: company.teamMembers
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addTeamMember:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Add brand
+   * POST /api/companies/:companyId/brands
+   */
+  static async addBrand(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const brandData = req.body;
+
+      if (!brandData.name || brandData.name.trim().length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Brand name is required'
+        });
+      }
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.addBrand(brandData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand added successfully',
+        data: {
+          brands: company.brands,
+          primaryBrand: company.primaryBrand
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addBrand:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Add location
+   * POST /api/companies/:companyId/locations
+   */
+  static async addLocation(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const locationData = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Check plan limits
+      if (!company.canPerformAction('add_location')) {
+        return res.status(403).json({
+          success: false,
+          message: 'Location limit reached for current plan',
+          data: {
+            currentLocations: company.locations.length,
+            maxLocations: company.maxLocations,
+            subscriptionPlan: company.subscriptionPlan
+          }
+        });
+      }
+
+      await company.addLocation(locationData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Location added successfully',
+        data: {
+          locations: company.locations,
+          currentLocations: company.locations.length,
+          maxLocations: company.maxLocations
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addLocation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get subscription details
+   * GET /api/companies/:companyId/subscription
+   */
+  static async getSubscriptionDetails(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Update trial status before returning subscription details
+      await company.updateTrialStatus();
+
+      res.status(200).json({
+        success: true,
+        message: 'Subscription details retrieved successfully',
+        data: {
+          subscriptionPlan: company.subscriptionPlan,
+          subscriptionStatus: company.getSubscriptionStatus(),
+          trialDaysRemaining: company.trialDaysRemaining,
+          trialExpired: company.trialExpired,
+          trialStartDate: company.trialStartDate,
+          trialEndDate: company.trialEndDate,
+          nextBillingDate: company.nextBillingDate,
+          billingCycle: company.billingCycle,
+          planLimits: company.planLimits,
+          usageStats: company.usageStats,
+          creditBalance: company.creditBalance,
+          pendingCredits: company.pendingCredits
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getSubscriptionDetails:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get payment history
+   * GET /api/companies/:companyId/payment-history
+   */
+  static async getPaymentHistory(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { limit = 10, offset = 0 } = req.query;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const paymentHistory = company.paymentHistory
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment history retrieved successfully',
+        data: {
+          paymentHistory,
+          totalTransactions: company.paymentHistory.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getPaymentHistory:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Admin: Verify CR
+   * POST /api/companies/:companyId/admin/verify-cr
+   */
+  static async adminVerifyCR(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { adminNotes } = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      if (company.crVerificationStatus === 'verified') {
+        return res.status(400).json({
+          success: false,
+          message: 'Company CR is already verified'
+        });
+      }
+
+      await company.verifyCR(adminNotes);
+
+      res.status(200).json({
+        success: true,
+        message: 'Company CR verified successfully',
+        data: {
+          crVerificationStatus: company.crVerificationStatus,
+          crVerifiedAt: company.crVerifiedAt,
+          isVerified: company.isVerified,
+          creditBalance: company.creditBalance,
+          pendingCredits: company.pendingCredits
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in adminVerifyCR:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company detailed info (admin)
+   * GET /api/companies/:companyId/detailed
+   */
+  static async getDetailedProfile(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Update trial status before returning detailed info
+      await company.updateTrialStatus();
+
+      res.status(200).json({
+        success: true,
+        message: 'Detailed company profile retrieved successfully',
+        data: company.toDetailedJSON()
+      });
+
+    } catch (error) {
+      console.error('Error in getDetailedProfile:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
    * Delete company profile
    * DELETE /api/companies/:companyId
    */

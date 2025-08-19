@@ -164,16 +164,51 @@ class User {
         filters.push({ field: 'userType', operator: '==', value: userType });
       }
 
+      // Remove orderBy to avoid index requirement
       const users = await databaseService.query(
         COLLECTIONS.USERS, 
         filters,
-        { field: 'createdAt', direction: 'desc' },
+        null, // No ordering to avoid composite index requirement
         limit
       );
 
       return users.map(userData => new User(userData));
     } catch (error) {
       console.error('Error getting all users:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user statistics without requiring complex indexes
+   */
+  static async getStats(userType = null) {
+    try {
+      // Get all users (without ordering to avoid index issues)
+      const allUsers = await User.getAll(1, 1000, userType);
+      
+      const verifiedUsers = allUsers.filter(user => user.isPhoneVerified);
+      const onboardedUsers = allUsers.filter(user => user.onboardingCompleted);
+      const completedProfiles = allUsers.filter(user => user.profileCompleted);
+
+      const stats = {
+        total: allUsers.length,
+        verified: verifiedUsers.length,
+        onboarded: onboardedUsers.length,
+        profilesCompleted: completedProfiles.length,
+        verificationRate: allUsers.length > 0 ? ((verifiedUsers.length / allUsers.length) * 100).toFixed(2) : 0,
+        onboardingRate: allUsers.length > 0 ? ((onboardedUsers.length / allUsers.length) * 100).toFixed(2) : 0,
+        completionRate: allUsers.length > 0 ? ((completedProfiles.length / allUsers.length) * 100).toFixed(2) : 0
+      };
+
+      if (userType) {
+        stats.userType = userType;
+        stats.filterApplied = `Filtered by userType: ${userType}`;
+      }
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting user stats:', error);
       throw error;
     }
   }

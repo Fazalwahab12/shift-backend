@@ -28,10 +28,6 @@ router.post('/', [
     .optional()
     .isArray()
     .withMessage('Selected roles must be an array'),
-  body('experienceLevel')
-    .optional()
-    .isIn(['entry', 'intermediate', 'senior'])
-    .withMessage('Experience level must be entry, intermediate, or senior'),
   body('hiringNeeds')
     .optional()
     .isLength({ min: 1, max: 100 })
@@ -40,14 +36,14 @@ router.post('/', [
     .optional()
     .isArray()
     .withMessage('Typical hiring roles must be an array'),
-  body('referralSource')
+  body('preferredSocialMedia')
     .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Referral source must be between 1 and 100 characters'),
-  body('referralDetails')
+    .isArray()
+    .withMessage('Preferred social media must be an array'),
+  body('preferredSocialMedia.*')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('Referral details must not exceed 500 characters')
+    .isIn(['instagram', 'facebook', 'twitter', 'linkedin', 'tiktok', 'snapchat', 'whatsapp', 'telegram'])
+    .withMessage('Each social media must be one of the supported platforms')
 ], OnboardingController.createOrUpdateOnboarding);
 
 /**
@@ -177,42 +173,41 @@ router.post('/:userId/complete-step', [
   body('stepName')
     .notEmpty()
     .withMessage('Step name is required')
-    .isIn(['industry_selection', 'role_selection', 'experience_level', 'hiring_needs', 'referral_source'])
+    .isIn(['industry_selection', 'role_selection', 'hiring_needs'])
     .withMessage('Invalid step name')
 ], OnboardingController.completeStep);
 
-/**
- * @route   PUT /api/onboarding/:userId/experience-level
- * @desc    Update experience level (for seekers)
- * @access  Public
- */
-router.put('/:userId/experience-level', [
-  param('userId')
-    .notEmpty()
-    .withMessage('User ID is required'),
-  body('experienceLevel')
-    .isIn(['entry', 'intermediate', 'senior'])
-    .withMessage('Experience level must be entry, intermediate, or senior')
-], OnboardingController.updateExperienceLevel);
+
 
 /**
- * @route   PUT /api/onboarding/:userId/referral
- * @desc    Update referral source
+ * @route   POST /api/onboarding/:userId/social-media
+ * @desc    Add social media preference
  * @access  Public
  */
-router.put('/:userId/referral', [
+router.post('/:userId/social-media', [
   param('userId')
     .notEmpty()
     .withMessage('User ID is required'),
-  body('referralSource')
+  body('socialMedia')
     .notEmpty()
-    .withMessage('Referral source is required')
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Referral source must be between 1 and 100 characters'),
-  body('referralDetails')
-    .optional()
-    .isLength({ max: 500 })
-    .withMessage('Referral details must not exceed 500 characters')
-], OnboardingController.updateReferralSource);
+    .withMessage('Social media is required')
+    .isIn(['instagram', 'facebook', 'twitter', 'linkedin', 'tiktok', 'snapchat', 'whatsapp', 'telegram'])
+    .withMessage('Social media must be one of the supported platforms')
+], OnboardingController.addSocialMediaPreference);
+
+/**
+ * @route   DELETE /api/onboarding/:userId/social-media/:socialMedia
+ * @desc    Remove social media preference
+ * @access  Public
+ */
+router.delete('/:userId/social-media/:socialMedia', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  param('socialMedia')
+    .notEmpty()
+    .withMessage('Social media is required')
+], OnboardingController.removeSocialMediaPreference);
+
 
 module.exports = router;

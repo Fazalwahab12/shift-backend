@@ -12,22 +12,15 @@ class OnboardingData {
     // Industry and Role Preferences
     this.selectedIndustries = data.selectedIndustries || [];
     this.selectedRoles = data.selectedRoles || [];
-    this.experienceLevel = data.experienceLevel || null; // For seekers
     this.hiringNeeds = data.hiringNeeds || null; // For companies
     this.typicalHiringRoles = data.typicalHiringRoles || []; // For companies
     
-    // How did you hear about us
-    this.referralSource = data.referralSource || null;
-    this.referralDetails = data.referralDetails || null;
-    
     // Additional preferences
     this.workLocationPreference = data.workLocationPreference || [];
-    this.shiftPreferences = data.shiftPreferences || [];
     this.salaryExpectations = data.salaryExpectations || {};
+    this.preferredSocialMedia = data.preferredSocialMedia || [];
     
-    // Completion status
-    this.isCompleted = data.isCompleted || false;
-    this.completedSteps = data.completedSteps || [];
+    // Removed completion tracking - onboarding goes directly to profile creation
     
     // Metadata
     this.createdAt = data.createdAt || null;
@@ -145,37 +138,36 @@ class OnboardingData {
     }
   }
 
+
   /**
-   * Mark step as completed
+   * Add social media preference
    */
-  async completeStep(stepName) {
+  async addSocialMediaPreference(socialMedia) {
     try {
-      if (!this.completedSteps.includes(stepName)) {
-        const updatedSteps = [...this.completedSteps, stepName];
-        const isCompleted = this.checkIfAllStepsCompleted(updatedSteps);
-        
-        return await this.update({ 
-          completedSteps: updatedSteps,
-          isCompleted: isCompleted
-        });
+      if (!this.preferredSocialMedia.includes(socialMedia)) {
+        const updatedSocialMedia = [...this.preferredSocialMedia, socialMedia];
+        return await this.update({ preferredSocialMedia: updatedSocialMedia });
       }
       return this;
     } catch (error) {
-      console.error('Error completing step:', error);
+      console.error('Error adding social media preference:', error);
       throw error;
     }
   }
 
   /**
-   * Check if all required steps are completed
+   * Remove social media preference
    */
-  checkIfAllStepsCompleted(steps = this.completedSteps) {
-    const requiredSteps = this.userType === 'seeker' 
-      ? ['industry_selection', 'role_selection', 'experience_level', 'referral_source']
-      : ['industry_selection', 'hiring_needs', 'referral_source'];
-    
-    return requiredSteps.every(step => steps.includes(step));
+  async removeSocialMediaPreference(socialMedia) {
+    try {
+      const updatedSocialMedia = this.preferredSocialMedia.filter(media => media !== socialMedia);
+      return await this.update({ preferredSocialMedia: updatedSocialMedia });
+    } catch (error) {
+      console.error('Error removing social media preference:', error);
+      throw error;
+    }
   }
+
 
   /**
    * Get onboarding statistics
@@ -279,40 +271,34 @@ class OnboardingData {
       userType: this.userType,
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
-      experienceLevel: this.experienceLevel,
       hiringNeeds: this.hiringNeeds,
       typicalHiringRoles: this.typicalHiringRoles,
-      referralSource: this.referralSource,
-      referralDetails: this.referralDetails,
       workLocationPreference: this.workLocationPreference,
-      shiftPreferences: this.shiftPreferences,
       salaryExpectations: this.salaryExpectations,
-      isCompleted: this.isCompleted,
-      completedSteps: this.completedSteps
+      preferredSocialMedia: this.preferredSocialMedia
     };
   }
 
   /**
-   * Convert to public JSON (safe for API responses)
+   * Convert to public JSON (safe for API responses) - only essential fields
    */
   toPublicJSON() {
-    return {
+    const result = {
       id: this.id,
+      userId: this.userId,
       userType: this.userType,
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
-      experienceLevel: this.experienceLevel,
-      hiringNeeds: this.hiringNeeds,
-      typicalHiringRoles: this.typicalHiringRoles,
-      referralSource: this.referralSource,
-      referralDetails: this.referralDetails,
-      workLocationPreference: this.workLocationPreference,
-      shiftPreferences: this.shiftPreferences,
-      isCompleted: this.isCompleted,
-      completedSteps: this.completedSteps,
-      completionPercentage: Math.round((this.completedSteps.length / (this.userType === 'seeker' ? 4 : 3)) * 100),
-      createdAt: this.createdAt
+      preferredSocialMedia: this.preferredSocialMedia
     };
+
+    // Only add company-specific fields if userType is company
+    if (this.userType === 'company') {
+      result.hiringNeeds = this.hiringNeeds;
+      result.typicalHiringRoles = this.typicalHiringRoles;
+    }
+
+    return result;
   }
 }
 

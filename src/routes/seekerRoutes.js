@@ -17,34 +17,103 @@ router.post('/', [
   body('userId')
     .notEmpty()
     .withMessage('User ID is required'),
-  body('firstName')
+  // Step 1: Personal Information
+  body('fullName')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Full name must be between 1 and 100 characters'),
+  body('idNumber')
+    .optional()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('ID number must be between 1 and 20 characters'),
+  body('dateOfBirth')
     .optional()
     .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be between 1 and 50 characters'),
-  body('lastName')
+    .withMessage('Date of birth must be between 1 and 50 characters'),
+  body('gender')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be between 1 and 50 characters'),
+    .isIn(['Male', 'Female'])
+    .withMessage('Gender must be Male or Female'),
+  body('mobileNumber')
+    .optional()
+    .matches(/^\+968-\d{8}$/)
+    .withMessage('Mobile number must be in format +968-XXXXXXXX'),
   body('email')
     .optional()
     .isEmail()
     .withMessage('Please provide a valid email address'),
-  body('dateOfBirth')
+  body('profilePhoto')
     .optional()
-    .isISO8601()
-    .withMessage('Please provide a valid date of birth'),
-  body('gender')
+    .isURL()
+    .withMessage('Profile photo must be a valid URL'),
+  body('bio')
     .optional()
-    .isIn(['male', 'female', 'other'])
-    .withMessage('Gender must be male, female, or other'),
-  body('experienceLevel')
+    .isLength({ max: 500 })
+    .withMessage('Bio must be less than 500 characters'),
+  body('educationalLevel')
     .optional()
-    .isIn(['entry', 'intermediate', 'senior'])
-    .withMessage('Experience level must be entry, intermediate, or senior'),
-  body('governorate')
+    .isIn(['High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'])
+    .withMessage('Educational level must be one of the valid options'),
+  // Step 2: Professional Information
+  body('industries')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Governorate must be between 1 and 50 characters')
+    .isArray()
+    .withMessage('Industries must be an array'),
+  body('roles')
+    .optional()
+    .isArray()
+    .withMessage('Roles must be an array'),
+  body('yearsOfExperience')
+    .optional()
+    .isLength({ min: 1, max: 10 })
+    .withMessage('Years of experience must be between 1 and 10 characters'),
+  body('skills')
+    .optional()
+    .isArray()
+    .withMessage('Skills must be an array'),
+  body('previousWorkplaces')
+    .optional()
+    .isArray()
+    .withMessage('Previous workplaces must be an array'),
+  body('certificates')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Certificates must be less than 1000 characters'),
+  // Step 3: Availability & Preferences
+  body('availability')
+    .optional()
+    .isIn(['Public Holidays', 'Both', 'Weekends'])
+    .withMessage('Availability must be one of the valid options'),
+  body('currentStatus')
+    .optional()
+    .isIn(['Student', 'Graduate', 'Working', 'Unemployed', 'Other'])
+    .withMessage('Current status must be one of the valid options'),
+  body('workType')
+    .optional()
+    .isIn(['Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'])
+    .withMessage('Work type must be one of the valid options'),
+  body('preferredLocations')
+    .optional()
+    .isArray()
+    .withMessage('Preferred locations must be an array'),
+  body('languages')
+    .optional()
+    .isArray()
+    .withMessage('Languages must be an array'),
+  body('retailAcademyTrained')
+    .optional()
+    .isIn(['Yes', 'No'])
+    .withMessage('Retail academy trained must be Yes or No'),
+  // Step 4: Terms & Conditions
+  body('acceptedTerms')
+    .optional()
+    .isBoolean()
+    .withMessage('Accepted terms must be a boolean'),
+  // Step 5: Profile Confirmation
+  body('profileConfirmed')
+    .optional()
+    .isBoolean()
+    .withMessage('Profile confirmed must be a boolean')
 ], SeekerController.createProfile);
 
 /**
@@ -78,30 +147,103 @@ router.put('/:seekerId', [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
-  body('firstName')
+  // Step 1: Personal Information
+  body('fullName')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Full name must be between 1 and 100 characters'),
+  body('idNumber')
+    .optional()
+    .isLength({ min: 1, max: 20 })
+    .withMessage('ID number must be between 1 and 20 characters'),
+  body('dateOfBirth')
     .optional()
     .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be between 1 and 50 characters'),
-  body('lastName')
+    .withMessage('Date of birth must be between 1 and 50 characters'),
+  body('gender')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be between 1 and 50 characters'),
+    .isIn(['Male', 'Female'])
+    .withMessage('Gender must be Male or Female'),
+  body('mobileNumber')
+    .optional()
+    .matches(/^\+968-\d{8}$/)
+    .withMessage('Mobile number must be in format +968-XXXXXXXX'),
   body('email')
     .optional()
     .isEmail()
     .withMessage('Please provide a valid email address'),
-  body('dateOfBirth')
+  body('profilePhoto')
     .optional()
-    .isISO8601()
-    .withMessage('Please provide a valid date of birth'),
-  body('gender')
+    .isURL()
+    .withMessage('Profile photo must be a valid URL'),
+  body('bio')
     .optional()
-    .isIn(['male', 'female', 'other'])
-    .withMessage('Gender must be male, female, or other'),
-  body('experienceLevel')
+    .isLength({ max: 500 })
+    .withMessage('Bio must be less than 500 characters'),
+  body('educationalLevel')
     .optional()
-    .isIn(['entry', 'intermediate', 'senior'])
-    .withMessage('Experience level must be entry, intermediate, or senior')
+    .isIn(['High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'])
+    .withMessage('Educational level must be one of the valid options'),
+  // Step 2: Professional Information
+  body('industries')
+    .optional()
+    .isArray()
+    .withMessage('Industries must be an array'),
+  body('roles')
+    .optional()
+    .isArray()
+    .withMessage('Roles must be an array'),
+  body('yearsOfExperience')
+    .optional()
+    .isLength({ min: 1, max: 10 })
+    .withMessage('Years of experience must be between 1 and 10 characters'),
+  body('skills')
+    .optional()
+    .isArray()
+    .withMessage('Skills must be an array'),
+  body('previousWorkplaces')
+    .optional()
+    .isArray()
+    .withMessage('Previous workplaces must be an array'),
+  body('certificates')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Certificates must be less than 1000 characters'),
+  // Step 3: Availability & Preferences
+  body('availability')
+    .optional()
+    .isIn(['Public Holidays', 'Both', 'Weekends'])
+    .withMessage('Availability must be one of the valid options'),
+  body('currentStatus')
+    .optional()
+    .isIn(['Student', 'Graduate', 'Working', 'Unemployed', 'Other'])
+    .withMessage('Current status must be one of the valid options'),
+  body('workType')
+    .optional()
+    .isIn(['Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'])
+    .withMessage('Work type must be one of the valid options'),
+  body('preferredLocations')
+    .optional()
+    .isArray()
+    .withMessage('Preferred locations must be an array'),
+  body('languages')
+    .optional()
+    .isArray()
+    .withMessage('Languages must be an array'),
+  body('retailAcademyTrained')
+    .optional()
+    .isIn(['Yes', 'No'])
+    .withMessage('Retail academy trained must be Yes or No'),
+  // Step 4: Terms & Conditions
+  body('acceptedTerms')
+    .optional()
+    .isBoolean()
+    .withMessage('Accepted terms must be a boolean'),
+  // Step 5: Profile Confirmation
+  body('profileConfirmed')
+    .optional()
+    .isBoolean()
+    .withMessage('Profile confirmed must be a boolean')
 ], SeekerController.updateProfile);
 
 /**
@@ -128,14 +270,28 @@ router.get('/search', [
     .optional(),
   query('roles')
     .optional(),
-  query('experienceLevel')
+  query('skills')
+    .optional(),
+  query('preferredLocations')
+    .optional(),
+  query('languages')
+    .optional(),
+  query('availability')
     .optional()
-    .isIn(['entry', 'intermediate', 'senior'])
-    .withMessage('Experience level must be entry, intermediate, or senior'),
-  query('governorate')
+    .isIn(['Public Holidays', 'Both', 'Weekends'])
+    .withMessage('Availability must be one of the valid options'),
+  query('workType')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Governorate must be between 1 and 50 characters'),
+    .isIn(['Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'])
+    .withMessage('Work type must be one of the valid options'),
+  query('retailAcademyTrained')
+    .optional()
+    .isIn(['Yes', 'No'])
+    .withMessage('Retail academy trained must be Yes or No'),
+  query('minActivityScore')
+    .optional()
+    .isInt({ min: 0, max: 100 })
+    .withMessage('Minimum activity score must be between 0 and 100'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -147,14 +303,14 @@ router.get('/search', [
 ], SeekerController.searchSeekers);
 
 /**
- * @route   GET /api/seekers/location/:governorate
- * @desc    Get seekers by location
+ * @route   GET /api/seekers/location/:location
+ * @desc    Get seekers by preferred location
  * @access  Public
  */
-router.get('/location/:governorate', [
-  param('governorate')
+router.get('/location/:location', [
+  param('location')
     .notEmpty()
-    .withMessage('Governorate is required'),
+    .withMessage('Location is required'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -214,5 +370,182 @@ router.delete('/:seekerId', [
     .notEmpty()
     .withMessage('Seeker ID is required')
 ], SeekerController.deleteProfile);
+
+/**
+ * @route   POST /api/seekers/:seekerId/request-video
+ * @desc    Request video recording
+ * @access  Public
+ */
+router.post('/:seekerId/request-video', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.requestVideoRecording);
+
+/**
+ * @route   POST /api/seekers/:seekerId/schedule-video
+ * @desc    Schedule video recording (Admin only)
+ * @access  Public
+ */
+router.post('/:seekerId/schedule-video', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('scheduledDate')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('Scheduled date must be a valid ISO date'),
+  body('location')
+    .notEmpty()
+    .withMessage('Recording location is required'),
+  body('adminNotes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Admin notes must be less than 500 characters')
+], SeekerController.scheduleVideoRecording);
+
+/**
+ * @route   POST /api/seekers/:seekerId/mark-video-recorded
+ * @desc    Mark video as recorded (Admin only)
+ * @access  Public
+ */
+router.post('/:seekerId/mark-video-recorded', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('adminNotes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Admin notes must be less than 500 characters')
+], SeekerController.markVideoRecorded);
+
+/**
+ * @route   POST /api/seekers/:seekerId/publish-video
+ * @desc    Publish video (Admin only)
+ * @access  Public
+ */
+router.post('/:seekerId/publish-video', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('videoUrl')
+    .notEmpty()
+    .isURL()
+    .withMessage('Video URL must be a valid URL'),
+  body('adminNotes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Admin notes must be less than 500 characters')
+], SeekerController.publishVideo);
+
+/**
+ * @route   POST /api/seekers/:seekerId/reject-video
+ * @desc    Reject video request (Admin only)
+ * @access  Public
+ */
+router.post('/:seekerId/reject-video', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('reason')
+    .notEmpty()
+    .isLength({ max: 500 })
+    .withMessage('Rejection reason must be less than 500 characters')
+], SeekerController.rejectVideoRequest);
+
+/**
+ * @route   GET /api/seekers/:seekerId/video-status
+ * @desc    Get video workflow status
+ * @access  Public
+ */
+router.get('/:seekerId/video-status', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.getVideoStatus);
+
+/**
+ * @route   POST /api/seekers/:seekerId/add-strike
+ * @desc    Add strike for no-show (Admin only)
+ * @access  Public
+ */
+router.post('/:seekerId/add-strike', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('reason')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Strike reason must be less than 200 characters')
+], SeekerController.addStrike);
+
+/**
+ * @route   POST /api/seekers/:seekerId/update-activity-score
+ * @desc    Update activity score
+ * @access  Public
+ */
+router.post('/:seekerId/update-activity-score', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('scoreChange')
+    .isInt({ min: -100, max: 100 })
+    .withMessage('Score change must be between -100 and 100')
+], SeekerController.updateActivityScore);
+
+/**
+ * @route   GET /api/seekers/high-performers
+ * @desc    Get high-performing seekers
+ * @access  Public
+ */
+router.get('/high-performers', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+], SeekerController.getHighPerformers);
+
+/**
+ * @route   GET /api/seekers/admin/video-pending
+ * @desc    Get seekers with pending video requests (Admin only)
+ * @access  Public
+ */
+router.get('/admin/video-pending', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+], SeekerController.getVideoPendingRequests);
+
+/**
+ * @route   GET /api/seekers/admin/video-scheduled
+ * @desc    Get seekers with scheduled video recordings (Admin only)
+ * @access  Public
+ */
+router.get('/admin/video-scheduled', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+], SeekerController.getScheduledVideoRecordings);
+
+/**
+ * @route   GET /api/seekers/admin/video-recorded
+ * @desc    Get seekers with recorded videos pending publication (Admin only)
+ * @access  Public
+ */
+router.get('/admin/video-recorded', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100')
+], SeekerController.getRecordedVideosPendingPublication);
+
+/**
+ * @route   GET /api/seekers/admin/video-stats
+ * @desc    Get video workflow statistics (Admin only)
+ * @access  Public
+ */
+router.get('/admin/video-stats', [], SeekerController.getVideoWorkflowStats);
 
 module.exports = router;
