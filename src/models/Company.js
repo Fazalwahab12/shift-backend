@@ -164,6 +164,30 @@ class Company {
   }
 
   /**
+   * Real-time trial countdown calculation
+   */
+  calculateRemainingDays() {
+    const now = new Date();
+    const trialStart = new Date(this.trialStartDate);
+    const daysPassed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
+    return Math.max(0, 14 - daysPassed);
+  }
+
+  /**
+   * Get real-time trial status with display format
+   */
+  getTrialStatus() {
+    const remainingDays = this.calculateRemainingDays();
+    return {
+      daysRemaining: remainingDays,
+      totalDays: 14,
+      daysPassed: 14 - remainingDays,
+      expired: remainingDays === 0,
+      displayText: `${remainingDays}/14 days`
+    };
+  }
+
+  /**
    * Update trial status and days remaining
    */
   async updateTrialStatus() {

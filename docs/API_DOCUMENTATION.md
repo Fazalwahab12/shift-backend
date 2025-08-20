@@ -1291,12 +1291,80 @@ GET /health
 }
 ```
 
-### Company Model
+### Company Model (Updated with Frontend Structure)
 
 ```json
 {
   "id": "string",
   "userId": "string",
+  "companyName": "string",
+  "crNumber": "string",
+  "adminDetails": {
+    "fullName": "string",
+    "role": "string",
+    "phone": "string",
+    "email": "string"
+  },
+  "brands": [
+    {
+      "name": "string",
+      "logo": "url",
+      "industry": "string",
+      "description": "string"
+    }
+  ],
+  "locations": [
+    {
+      "address": "string",
+      "governorate": "string",
+      "wilayat": "string",
+      "coordinates": {
+        "latitude": "number",
+        "longitude": "number"
+      },
+      "manager": {
+        "name": "string",
+        "phone": "string",
+        "email": "string",
+        "verified": "boolean"
+      },
+      "operatingHours": "object"
+    }
+  ],
+  "teamMembers": [
+    {
+      "email": "string",
+      "role": "string",
+      "invitedAt": "timestamp",
+      "status": "pending|accepted|declined"
+    }
+  ],
+  "subscriptionPlan": "trial|starter|professional|custom",
+  "subscriptionStatus": "trial|active|expired|suspended",
+  "trialStartDate": "timestamp",
+  "trialEndDate": "timestamp",
+  "trialDaysRemaining": "number",
+  "trialExpired": "boolean",
+  "paymentMethods": [
+    {
+      "type": "bank|paypal|stripe",
+      "name": "string",
+      "details": "object",
+      "isDefault": "boolean"
+    }
+  ],
+  "paymentHistory": "array",
+  "creditBalance": "number",
+  "termsAccepted": "boolean",
+  "termsAcceptedAt": "timestamp",
+  "termsVersion": "string",
+  "profileConfirmed": "boolean",
+  "confirmedAt": "timestamp",
+  "crVerificationStatus": "pending|verified|rejected",
+  "isVerified": "boolean",
+  "isActive": "boolean",
+  "createdAt": "timestamp",
+  "updatedAt": "timestamp"
   "companyName": "string",
   "companyNameArabic": "string",
   "commercialRegistrationNumber": "string",
