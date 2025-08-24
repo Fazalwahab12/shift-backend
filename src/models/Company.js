@@ -206,9 +206,9 @@ class Company {
           duration: 6,
           durationUnit: 'months',
           features: {
-            instantMatches: 20,
-            interviews: 20,
-            locations: 1,
+          instantMatches: 20,
+          interviews: 20,
+          locations: 1,
             analytics: 'basic',
             support: 'email'
           },
@@ -230,9 +230,9 @@ class Company {
           duration: 12,
           durationUnit: 'months',
           features: {
-            instantMatches: 50,
-            interviews: 50,
-            locations: 1,
+          instantMatches: 50,
+          interviews: 50,
+          locations: 1,
             analytics: 'advanced',
             support: 'priority'
           },
@@ -744,17 +744,17 @@ class Company {
         return {
           instantMatches: 'unlimited',
           interviews: 'unlimited',
-          locations: 1,
-          jobPostings: 'unlimited',
+        locations: 1,
+        jobPostings: 'unlimited',
           teamMembers: 1,
           analytics: 'basic',
-          support: 'email'
+        support: 'email'
         };
       case 'starter':
         return {
-          instantMatches: 20,
-          interviews: 20,
-          locations: 1,
+        instantMatches: 20,
+        interviews: 20,
+        locations: 1,
           jobPostings: 'unlimited',
           teamMembers: 3,
           analytics: 'basic',
@@ -762,23 +762,23 @@ class Company {
         };
       case 'pro':
         return {
-          instantMatches: 50,
-          interviews: 50,
+        instantMatches: 50,
+        interviews: 50,
           locations: 1,
           jobPostings: 'unlimited',
           teamMembers: 10,
           analytics: 'advanced',
-          support: 'priority'
+        support: 'priority'
         };
       case 'custom':
         return {
-          instantMatches: 'unlimited',
-          interviews: 'unlimited',
+        instantMatches: 'unlimited',
+        interviews: 'unlimited',
           locations: 'unlimited',
-          jobPostings: 'unlimited',
+        jobPostings: 'unlimited',
           teamMembers: 'unlimited',
           analytics: 'enterprise',
-          support: 'dedicated'
+        support: 'dedicated'
         };
       default:
         return {

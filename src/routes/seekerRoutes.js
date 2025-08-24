@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const SeekerController = require('../controllers/seekerController');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -11,12 +12,9 @@ const router = express.Router();
 /**
  * @route   POST /api/seekers
  * @desc    Create seeker profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/', [
-  body('userId')
-    .notEmpty()
-    .withMessage('User ID is required'),
+router.post('/', authenticateToken, [
   // Step 1: Personal Information
   body('fullName')
     .optional()
@@ -119,9 +117,9 @@ router.post('/', [
 /**
  * @route   GET /api/seekers/user/:userId
  * @desc    Get seeker profile by user ID
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/user/:userId', [
+router.get('/user/:userId', authenticateToken, [
   param('userId')
     .notEmpty()
     .withMessage('User ID is required')
@@ -130,9 +128,9 @@ router.get('/user/:userId', [
 /**
  * @route   GET /api/seekers/:seekerId
  * @desc    Get seeker profile by ID
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:seekerId', [
+router.get('/:seekerId', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -141,9 +139,9 @@ router.get('/:seekerId', [
 /**
  * @route   PUT /api/seekers/:seekerId
  * @desc    Update seeker profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:seekerId', [
+router.put('/:seekerId', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -249,9 +247,9 @@ router.put('/:seekerId', [
 /**
  * @route   PUT /api/seekers/:seekerId/step/:step
  * @desc    Update profile step
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:seekerId/step/:step', [
+router.put('/:seekerId/step/:step', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -320,9 +318,9 @@ router.get('/location/:location', [
 /**
  * @route   GET /api/seekers/:seekerId/completion
  * @desc    Get profile completion status
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:seekerId/completion', [
+router.get('/:seekerId/completion', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -331,9 +329,9 @@ router.get('/:seekerId/completion', [
 /**
  * @route   POST /api/seekers/:seekerId/photo
  * @desc    Upload profile photo
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/photo', [
+router.post('/:seekerId/photo', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -347,9 +345,9 @@ router.post('/:seekerId/photo', [
 /**
  * @route   POST /api/seekers/:seekerId/cv
  * @desc    Upload CV
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/cv', [
+router.post('/:seekerId/cv', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -363,9 +361,9 @@ router.post('/:seekerId/cv', [
 /**
  * @route   DELETE /api/seekers/:seekerId
  * @desc    Delete seeker profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.delete('/:seekerId', [
+router.delete('/:seekerId', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -374,9 +372,9 @@ router.delete('/:seekerId', [
 /**
  * @route   POST /api/seekers/:seekerId/request-video
  * @desc    Request video recording
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/request-video', [
+router.post('/:seekerId/request-video', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -385,9 +383,9 @@ router.post('/:seekerId/request-video', [
 /**
  * @route   POST /api/seekers/:seekerId/schedule-video
  * @desc    Schedule video recording (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:seekerId/schedule-video', [
+router.post('/:seekerId/schedule-video', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -407,9 +405,9 @@ router.post('/:seekerId/schedule-video', [
 /**
  * @route   POST /api/seekers/:seekerId/mark-video-recorded
  * @desc    Mark video as recorded (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:seekerId/mark-video-recorded', [
+router.post('/:seekerId/mark-video-recorded', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -422,9 +420,9 @@ router.post('/:seekerId/mark-video-recorded', [
 /**
  * @route   POST /api/seekers/:seekerId/publish-video
  * @desc    Publish video (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:seekerId/publish-video', [
+router.post('/:seekerId/publish-video', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -441,9 +439,9 @@ router.post('/:seekerId/publish-video', [
 /**
  * @route   POST /api/seekers/:seekerId/reject-video
  * @desc    Reject video request (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:seekerId/reject-video', [
+router.post('/:seekerId/reject-video', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -456,9 +454,9 @@ router.post('/:seekerId/reject-video', [
 /**
  * @route   GET /api/seekers/:seekerId/video-status
  * @desc    Get video workflow status
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:seekerId/video-status', [
+router.get('/:seekerId/video-status', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -467,9 +465,9 @@ router.get('/:seekerId/video-status', [
 /**
  * @route   POST /api/seekers/:seekerId/add-strike
  * @desc    Add strike for no-show (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:seekerId/add-strike', [
+router.post('/:seekerId/add-strike', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -482,9 +480,9 @@ router.post('/:seekerId/add-strike', [
 /**
  * @route   POST /api/seekers/:seekerId/update-activity-score
  * @desc    Update activity score
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/update-activity-score', [
+router.post('/:seekerId/update-activity-score', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -508,9 +506,9 @@ router.get('/high-performers', [
 /**
  * @route   GET /api/seekers/admin/video-pending
  * @desc    Get seekers with pending video requests (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/admin/video-pending', [
+router.get('/admin/video-pending', authenticateToken, [
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -520,9 +518,9 @@ router.get('/admin/video-pending', [
 /**
  * @route   GET /api/seekers/admin/video-scheduled
  * @desc    Get seekers with scheduled video recordings (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/admin/video-scheduled', [
+router.get('/admin/video-scheduled', authenticateToken, [
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -532,9 +530,9 @@ router.get('/admin/video-scheduled', [
 /**
  * @route   GET /api/seekers/admin/video-recorded
  * @desc    Get seekers with recorded videos pending publication (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/admin/video-recorded', [
+router.get('/admin/video-recorded', authenticateToken, [
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -544,16 +542,16 @@ router.get('/admin/video-recorded', [
 /**
  * @route   GET /api/seekers/admin/video-stats
  * @desc    Get video workflow statistics (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/admin/video-stats', [], SeekerController.getVideoWorkflowStats);
+router.get('/admin/video-stats', authenticateToken, [], SeekerController.getVideoWorkflowStats);
 
 /**
  * @route   POST /api/seekers/:seekerId/apply-job
  * @desc    Record job application
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/apply-job', [
+router.post('/:seekerId/apply-job', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -574,9 +572,9 @@ router.post('/:seekerId/apply-job', [
 /**
  * @route   POST /api/seekers/:seekerId/record-interview
  * @desc    Record interview
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/record-interview', [
+router.post('/:seekerId/record-interview', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -603,9 +601,9 @@ router.post('/:seekerId/record-interview', [
 /**
  * @route   POST /api/seekers/:seekerId/record-no-show
  * @desc    Record no-show
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/record-no-show', [
+router.post('/:seekerId/record-no-show', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -624,9 +622,9 @@ router.post('/:seekerId/record-no-show', [
 /**
  * @route   POST /api/seekers/:seekerId/record-hire
  * @desc    Record hire/job completion
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:seekerId/record-hire', [
+router.post('/:seekerId/record-hire', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required'),
@@ -659,9 +657,9 @@ router.post('/:seekerId/record-hire', [
 /**
  * @route   GET /api/seekers/:seekerId/stats
  * @desc    Get seeker statistics (for CSV export)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:seekerId/stats', [
+router.get('/:seekerId/stats', authenticateToken, [
   param('seekerId')
     .notEmpty()
     .withMessage('Seeker ID is required')
@@ -670,9 +668,9 @@ router.get('/:seekerId/stats', [
 /**
  * @route   GET /api/seekers/admin/export-csv
  * @desc    Export all seekers data (Admin only)
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/admin/export-csv', [
+router.get('/admin/export-csv', authenticateToken, [
   query('limit')
     .optional()
     .isInt({ min: 1, max: 5000 })

@@ -41,8 +41,8 @@ router.post('/', [
     .withMessage('Preferred social media must be an array'),
   body('preferredSocialMedia.*')
     .optional()
-    .isIn(['instagram', 'facebook', 'twitter', 'linkedin', 'tiktok', 'snapchat', 'whatsapp', 'telegram'])
-    .withMessage('Each social media must be one of the supported platforms')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Each social media preference must be between 1 and 100 characters')
 ], OnboardingController.createOrUpdateOnboarding);
 
 /**

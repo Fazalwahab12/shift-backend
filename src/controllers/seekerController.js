@@ -24,7 +24,9 @@ class SeekerController {
         });
       }
 
-      const { userId, ...profileData } = req.body;
+      // Extract userId from JWT token (set by authenticateToken middleware)
+      const userId = req.user.userId;
+      const profileData = req.body;
 
       // Verify user exists and is a seeker
       const user = await User.findById(userId);

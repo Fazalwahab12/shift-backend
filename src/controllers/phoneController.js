@@ -288,8 +288,14 @@ class PhoneController {
         lastLoginAt: new Date().toISOString()
       });
 
-      // Generate JWT tokens
-      const tokens = generateTokenPair(user.id, user.userType);
+      // Generate JWT tokens with user data
+      const tokens = generateTokenPair(user.id, user.userType, {
+        phoneNumber: user.phoneNumber,
+        countryCode: user.countryCode,
+        isPhoneVerified: user.isPhoneVerified,
+        onboardingCompleted: user.onboardingCompleted,
+        profileCompleted: user.profileCompleted
+      });
 
       // Determine next step based on completion status
       let nextStep = 'onboarding';
@@ -355,7 +361,33 @@ class PhoneController {
 
       // Verify refresh token and generate new access token
       const { refreshAccessToken } = require('../utils/auth');
-      const result = refreshAccessToken(refreshToken);
+      
+      // Get user data from refresh token to include in new access token
+      const refreshResult = require('../utils/auth').verifyRefreshToken(refreshToken);
+      if (!refreshResult.valid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token'
+        });
+      }
+      
+      // Get current user data to include in new token
+      const user = await User.findById(refreshResult.payload.userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+      
+      const result = refreshAccessToken(refreshToken, {
+        phoneNumber: user.phoneNumber,
+        countryCode: user.countryCode,
+        userType: user.userType,
+        isPhoneVerified: user.isPhoneVerified,
+        onboardingCompleted: user.onboardingCompleted,
+        profileCompleted: user.profileCompleted
+      });
 
       if (!result.success) {
         return res.status(401).json({

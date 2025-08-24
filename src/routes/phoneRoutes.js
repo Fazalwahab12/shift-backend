@@ -88,8 +88,8 @@ router.post('/verify-otp', [
     .matches(/^\+\d+$/)
     .withMessage('Country code must start with + followed by numbers'),
   body('otp')
-    .isLength({ min: 6, max: 6 })
-    .withMessage('OTP must be exactly 6 digits')
+    .isLength({ min: 4, max: 6 })
+    .withMessage('OTP must be between 4 and 6 digits')
     .isNumeric()
     .withMessage('OTP must contain only numbers')
 ], PhoneController.verifyOTP);

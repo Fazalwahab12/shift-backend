@@ -19,10 +19,15 @@ const JWT_CONFIG = {
 /**
  * Generate access token (short-lived)
  */
-const generateAccessToken = (userId, userType) => {
+const generateAccessToken = (userId, userType, userData = {}) => {
   const payload = {
     userId,
     userType,
+    phoneNumber: userData.phoneNumber || '',
+    countryCode: userData.countryCode || '+968',
+    isPhoneVerified: userData.isPhoneVerified || false,
+    onboardingCompleted: userData.onboardingCompleted || false,
+    profileCompleted: userData.profileCompleted || false,
     type: 'access',
     iat: Math.floor(Date.now() / 1000),
     iss: JWT_CONFIG.ISSUER,
@@ -37,9 +42,10 @@ const generateAccessToken = (userId, userType) => {
 /**
  * Generate refresh token (long-lived, doesn't expire automatically)
  */
-const generateRefreshToken = (userId) => {
+const generateRefreshToken = (userId, userType) => {
   const payload = {
     userId,
+    userType,
     type: 'refresh',
     iat: Math.floor(Date.now() / 1000),
     iss: JWT_CONFIG.ISSUER,
@@ -106,9 +112,9 @@ const verifyRefreshToken = (token) => {
 /**
  * Generate token pair (access + refresh)
  */
-const generateTokenPair = (userId, userType) => {
-  const accessToken = generateAccessToken(userId, userType);
-  const refreshToken = generateRefreshToken(userId);
+const generateTokenPair = (userId, userType, userData = {}) => {
+  const accessToken = generateAccessToken(userId, userType, userData);
+  const refreshToken = generateRefreshToken(userId, userType);
 
   return {
     accessToken,
@@ -121,7 +127,7 @@ const generateTokenPair = (userId, userType) => {
 /**
  * Refresh access token using refresh token
  */
-const refreshAccessToken = (refreshToken) => {
+const refreshAccessToken = (refreshToken, userData = {}) => {
   const refreshResult = verifyRefreshToken(refreshToken);
   
   if (!refreshResult.valid) {
@@ -132,9 +138,12 @@ const refreshAccessToken = (refreshToken) => {
   }
 
   // Generate new access token
+  // Use userType from userData if available, otherwise from refresh token
+  const userType = userData.userType || refreshResult.payload.userType;
   const newAccessToken = generateAccessToken(
     refreshResult.payload.userId, 
-    refreshResult.payload.userType
+    userType,
+    userData
   );
 
   return {
@@ -156,22 +165,27 @@ const generateOTP = (length = 6) => {
 
 /**
  * Verify OTP (mock implementation - replace with actual SMS provider integration)
+ * For development: Accept any 4-6 digit OTP
+ * TODO: Replace with strict SMS provider verification in production
  */
 const verifyOTP = async (phoneNumber, otp) => {
-  // TODO: Replace with actual SMS provider verification
-  // For now, accept any 6-digit OTP for development
+  // For development: Accept any 4-6 digit OTP
+  // TODO: Replace with actual SMS provider verification in production
   
-  if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+  if (!otp || otp.length < 4 || otp.length > 6 || !/^\d+$/.test(otp)) {
     return {
       valid: false,
-      error: 'Invalid OTP format'
+      error: 'Invalid OTP format - must be 4-6 digits'
     };
   }
 
-  // Mock verification - in production, verify with SMS provider
+  // For development: Accept any valid format OTP
+  // In production, this will verify with Oman SMS provider
+  console.log(`🔧 DEV MODE: Accepting any OTP for ${phoneNumber}: ${otp}`);
+  
   return {
     valid: true,
-    message: 'OTP verified successfully'
+    message: 'OTP verified successfully (Dev Mode)'
   };
 };
 
