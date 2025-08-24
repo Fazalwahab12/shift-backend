@@ -27,6 +27,7 @@ const phoneRoutes = require('./routes/phoneRoutes');
 const onboardingRoutes = require('./routes/onboardingRoutes');
 const seekerRoutes = require('./routes/seekerRoutes');
 const companyRoutes = require('./routes/companyRoutes');
+const jobRoutes = require('./routes/jobRoutes');
 const userJourneyRoutes = require('./routes/userJourneyRoutes');
 
 /**
@@ -144,6 +145,7 @@ class ShiftServer {
     this.app.use('/api/onboarding', onboardingRoutes);
     this.app.use('/api/seekers', seekerRoutes);
     this.app.use('/api/companies', companyRoutes);
+    this.app.use('/api/jobs', jobRoutes);
     this.app.use('/api/journey', userJourneyRoutes);
 
     // API documentation endpoint
@@ -157,6 +159,7 @@ class ShiftServer {
           onboarding: '/api/onboarding',
           seekers: '/api/seekers',
           companies: '/api/companies',
+          jobs: '/api/jobs',
           journey: '/api/journey'
         },
         timestamp: new Date().toISOString()

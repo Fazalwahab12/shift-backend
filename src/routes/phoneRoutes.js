@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const PhoneController = require('../controllers/phoneController');
+const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -26,6 +27,7 @@ router.post('/register', [
     .matches(/^\+\d+$/)
     .withMessage('Country code must start with + followed by numbers'),
   body('userType')
+    .optional()
     .isIn(['seeker', 'company'])
     .withMessage('User type must be either seeker or company')
 ], PhoneController.registerPhone);
@@ -47,19 +49,61 @@ router.get('/check/:phoneNumber', [
     .withMessage('Country code must start with + followed by numbers')
 ], PhoneController.checkPhone);
 
+
+
 /**
- * @route   PUT /api/phone/verify
- * @desc    Update phone verification status
+ * @route   POST /api/phone/send-otp
+ * @desc    Send OTP to existing user
  * @access  Public
  */
-router.put('/verify', [
-  body('userId')
+router.post('/send-otp', [
+  body('phoneNumber')
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Phone number must be between 8 and 15 digits')
+    .isNumeric()
+    .withMessage('Phone number must contain only numbers'),
+  body('countryCode')
+    .optional()
+    .isLength({ min: 2, max: 5 })
+    .withMessage('Country code must be between 2 and 5 characters')
+    .matches(/^\+\d+$/)
+    .withMessage('Country code must start with + followed by numbers')
+], PhoneController.sendOTP);
+
+/**
+ * @route   POST /api/phone/verify-otp
+ * @desc    Verify OTP and generate JWT tokens
+ * @access  Public
+ */
+router.post('/verify-otp', [
+  body('phoneNumber')
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Phone number must be between 8 and 15 digits')
+    .isNumeric()
+    .withMessage('Phone number must contain only numbers'),
+  body('countryCode')
+    .optional()
+    .isLength({ min: 2, max: 5 })
+    .withMessage('Country code must be between 2 and 5 characters')
+    .matches(/^\+\d+$/)
+    .withMessage('Country code must start with + followed by numbers'),
+  body('otp')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('OTP must be exactly 6 digits')
+    .isNumeric()
+    .withMessage('OTP must contain only numbers')
+], PhoneController.verifyOTP);
+
+/**
+ * @route   POST /api/phone/refresh-token
+ * @desc    Refresh access token using refresh token
+ * @access  Public
+ */
+router.post('/refresh-token', [
+  body('refreshToken')
     .notEmpty()
-    .withMessage('User ID is required'),
-  body('verified')
-    .isBoolean()
-    .withMessage('Verified must be a boolean value')
-], PhoneController.verifyPhone);
+    .withMessage('Refresh token is required')
+], PhoneController.refreshToken);
 
 /**
  * @route   GET /api/phone/user/:phoneNumber
@@ -80,13 +124,11 @@ router.get('/user/:phoneNumber', [
 
 /**
  * @route   PUT /api/phone/user-type
- * @desc    Update user type
- * @access  Public
+ * @desc    Update user type (token-based)
+ * @access  Private
  */
 router.put('/user-type', [
-  body('userId')
-    .notEmpty()
-    .withMessage('User ID is required'),
+  authenticateToken,
   body('userType')
     .isIn(['seeker', 'company'])
     .withMessage('User type must be either seeker or company')

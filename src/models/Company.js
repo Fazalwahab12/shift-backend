@@ -2,35 +2,265 @@ const { databaseService, COLLECTIONS } = require('../config/database');
 
 /**
  * Company Profile Model - Professional Implementation
- * Matches frontend company profile steps with enterprise-grade features
+ * Enhanced with Payment History CSV structure and Pricing Plans
  */
 class Company {
   constructor(data = {}) {
     this.id = data.id || null;
     this.userId = data.userId || null;
     
-    // STEP 1: Company Information & Admin Details
-    this.companyName = data.companyName || null; // Full legal name
-    this.crNumber = data.crNumber || null; // Commercial Registration Number
+    // STEP 1: Company Information & Admin Details (Based on CSV Structure)
+    this.companyName = data.companyName || null;
+    this.crNumber = data.crNumber || null;
+    
+    // Enhanced Admin Details (Matching CSV columns)
     this.adminDetails = data.adminDetails || {
-      fullName: null,
+      fullName: null, // Admin column from CSV
       role: null,
-      phone: null,
-      email: null
+      phone: null, // Admin Phone Number column from CSV
+      email: null, // Admin Email column from CSV
+      position: null,
+      department: null,
+      isPrimaryContact: true
+    };
+    
+    // CSV-specific fields
+    this.companyNumber = data.companyNumber || null; // No. column from CSV
+    this.industry = data.industry || null; // Industry column from CSV
+    this.roles = data.roles || []; // Roles column from CSV
+    this.registrationDate = data.registrationDate || new Date().toISOString(); // Registration Date column from CSV
+    this.numberOfBands = data.numberOfBands || 1; // No. of Bands / Business Entities column from CSV
+    this.numberOfBranches = data.numberOfBranches || 1; // No. of Branches column from CSV
+    this.lastActiveDate = data.lastActiveDate || null; // Last Active Date column from CSV
+    this.numberOfJobPosts = data.numberOfJobPosts || 0; // Number of Job Posts column from CSV
+    this.totalInstantHires = data.totalInstantHires || 0; // Total Instant Hires column from CSV
+    this.totalInterviews = data.totalInterviews || 0; // Total Interviews column from CSV
+    this.spentOnHiring = data.spentOnHiring || 0; // Spent on Hiring column from CSV
+    this.usedFreeTrial = data.usedFreeTrial || false; // Used Free Trial? column from CSV
+    this.previousPlansPurchases = data.previousPlansPurchases || []; // Previous Plans Purchases column from CSV
+    
+    // Enhanced Company Analytics from CSV Data
+    this.companyAnalytics = data.companyAnalytics || {
+      // CSV-based metrics
+      totalJobPosts: this.numberOfJobPosts || 0,
+      totalInstantHires: this.totalInstantHires || 0,
+      totalInterviews: this.totalInterviews || 0,
+      totalSpentOnHiring: this.spentOnHiring || 0, // OMR
+      hasUsedFreeTrial: this.usedFreeTrial || false,
+      previousPlanPurchases: this.previousPlansPurchases || [],
+      lastActiveDate: this.lastActiveDate || null,
+      registrationDate: this.registrationDate || new Date().toISOString(),
+      
+      // Enhanced performance metrics
+      performanceMetrics: {
+        hireSuccessRate: 0,
+        averageTimeToHire: 0,
+        interviewToHireRatio: 0,
+        candidateQualityScore: 0,
+        costPerHire: 0,
+        timeToFill: 0,
+        retentionRate: 0
+      },
+      
+      // Business structure metrics
+      businessStructure: {
+        numberOfBands: this.numberOfBands || 1,
+        numberOfBranches: this.numberOfBranches || 1,
+        totalBusinessEntities: this.numberOfBands || 1,
+        operationalScale: 'local'
+      },
+      
+      // Hiring efficiency metrics
+      hiringEfficiency: {
+        jobsPostedThisMonth: 0,
+        interviewsConductedThisMonth: 0,
+        hiresThisMonth: 0,
+        averageResponseTime: 0,
+        candidateSatisfactionScore: 0
+      }
+    };
+    
+    // Industry Classification (Enhanced for CSV compatibility)
+    this.industryDetails = data.industryDetails || {
+      primaryIndustry: this.industry || null, // Industry column from CSV
+      secondaryIndustries: [],
+      industrySize: null,
+      businessType: null,
+      specializations: [],
+      certifications: [],
+      roles: this.roles || [], // Roles column from CSV
+      industryCategory: null,
+      subIndustry: null
+    };
+    
+    // Company Structure & Scale (Enhanced for CSV compatibility)
+    this.organizationStructure = data.organizationStructure || {
+      numberOfBands: this.numberOfBands || 1, // No. of Bands / Business Entities column from CSV
+      numberOfBranches: this.numberOfBranches || 1, // No. of Branches column from CSV
+      totalEmployees: null,
+      departmentCount: 0,
+      hierarchyLevels: 1,
+      operationalScale: 'local',
+      businessEntities: this.numberOfBands || 1,
+      totalLocations: this.numberOfBranches || 1
     };
     
     // STEP 2: Business Entity / Brand Details
-    this.brands = data.brands || []; // Array of brands/entities
-    this.primaryBrand = data.primaryBrand || null; // Main brand
+    this.brands = data.brands || [];
+    this.primaryBrand = data.primaryBrand || null;
+    
+    // Enhanced Brand Portfolio Management
+    this.brandPortfolio = data.brandPortfolio || {
+      totalBrands: 0,
+      activeBrands: 0,
+      brandCategories: [],
+      brandPerformance: {},
+      marketPresence: {
+        localMarkets: [],
+        regionalMarkets: [],
+        internationalMarkets: []
+      },
+      brandAssets: {
+        logos: {},
+        trademarks: [],
+        copyrights: [],
+        patents: []
+      }
+    };
     
     // STEP 3: Business Location & Team
-    this.locations = data.locations || []; // Array of business locations
-    this.teamMembers = data.teamMembers || []; // Invited team members
-    this.maxLocations = data.maxLocations || 1; // Based on subscription plan
+    this.locations = data.locations || [];
+    this.teamMembers = data.teamMembers || [];
+    this.maxLocations = data.maxLocations || 1;
     
-    // STEP 4: SUBSCRIPTION & PAYMENT SYSTEM
-    this.subscriptionPlan = data.subscriptionPlan || 'trial'; // 'trial', 'starter', 'professional', 'custom'
-    this.subscriptionStatus = data.subscriptionStatus || 'trial'; // 'trial', 'active', 'expired', 'suspended'
+    // STEP 4: ENHANCED SUBSCRIPTION & PAYMENT SYSTEM (Based on CSV and Pricing Plans)
+    this.subscriptionPlan = data.subscriptionPlan || 'trial';
+    this.subscriptionStatus = data.subscriptionStatus || 'trial';
+    
+    // Enhanced Pricing Model (Based on CSV and Pricing Plans)
+    this.pricingDetails = data.pricingDetails || {
+      // Free Trial (14 Days On Us!)
+      freeTrial: {
+        duration: 14, // days
+        features: {
+          instantMatches: 'unlimited',
+          interviews: 'unlimited',
+          locations: 1,
+          fullAccess: true,
+          support: 'email'
+        },
+        activated: false,
+        startDate: null,
+        endDate: null,
+        description: "Get full access to all features for one location — absolutely free."
+      },
+      
+      // Pay As You Go (Only pay when you need to hire)
+      payAsYouGo: {
+        available: true,
+        description: "Only pay when you need to hire.",
+        pricing: {
+          instantMatch: 5, // OMR per match
+          interviewPackages: [
+            {
+              name: 'Small Package',
+              interviews: 10,
+              price: 50, // OMR
+              validity: 4,
+              validityUnit: 'weeks',
+              savings: 0
+            },
+            {
+              name: 'Medium Package',
+              interviews: 20,
+              price: 80, // OMR
+              validity: 4,
+              validityUnit: 'weeks',
+              savings: 20
+            },
+            {
+              name: 'Large Package',
+              interviews: 50,
+              price: 250, // OMR
+              validity: 6,
+              validityUnit: 'weeks',
+              savings: 100
+            }
+          ]
+        },
+        usage: {
+          currentMatches: 0,
+          currentInterviews: 0,
+          totalSpent: 0
+        }
+      },
+      
+      // Subscription Plans
+      subscriptionPlans: [
+        {
+          id: 'starter',
+          name: 'Starter Bundle',
+          price: 99, // OMR
+          originalPrice: 198,
+          savings: 50, // percentage
+          duration: 6,
+          durationUnit: 'months',
+          features: {
+            instantMatches: 20,
+            interviews: 20,
+            locations: 1,
+            analytics: 'basic',
+            support: 'email'
+          },
+          benefits: [
+            '20 Instant Matches',
+            '20 Interviews',
+            '1 Location',
+            'Save 50%',
+            'Valid for 6 months'
+          ],
+          popular: false
+        },
+        {
+          id: 'pro',
+          name: 'Pro Bundle',
+          price: 200, // OMR
+          originalPrice: 500,
+          savings: 60, // percentage
+          duration: 12,
+          durationUnit: 'months',
+          features: {
+            instantMatches: 50,
+            interviews: 50,
+            locations: 1,
+            analytics: 'advanced',
+            support: 'priority'
+          },
+          benefits: [
+            '50 Instant Matches',
+            '50 Interviews',
+            '1 Location',
+            'Save 60%',
+            'Valid for 12 months'
+          ],
+          popular: true
+        }
+      ],
+      
+      // Custom Plans
+      customPlans: {
+        available: true,
+        description: "Contact us if you have multiple locations or need a tailored plan that fits your hiring needs.",
+        features: [
+          'Multiple locations',
+          'Unlimited instant matches',
+          'Unlimited interviews',
+          'Custom integrations',
+          'Dedicated support',
+          'Advanced analytics'
+        ]
+      }
+    };
     
     // 14-DAY TRIAL SYSTEM
     this.trialStartDate = data.trialStartDate || new Date().toISOString();
@@ -38,12 +268,29 @@ class Company {
     this.trialDaysRemaining = data.trialDaysRemaining || 14;
     this.trialExpired = data.trialExpired || false;
     
-    // PAYMENT INTEGRATION
-    this.paymentMethods = data.paymentMethods || []; // Multiple payment methods
+    // ENHANCED PAYMENT INTEGRATION (Based on CSV Structure)
+    this.paymentMethods = data.paymentMethods || [];
     this.defaultPaymentMethod = data.defaultPaymentMethod || null;
-    this.paymentHistory = data.paymentHistory || []; // Transaction history
+    
+    // Payment History (Based on CSV Structure)
+    this.paymentHistory = data.paymentHistory || []; // Array of payment transactions
     this.nextBillingDate = data.nextBillingDate || null;
-    this.billingCycle = data.billingCycle || 'monthly'; // 'monthly', 'yearly'
+    this.billingCycle = data.billingCycle || 'monthly';
+    
+    // Payment Transaction Structure (Matching CSV)
+    this.paymentTransactionStructure = {
+      transactionId: null, // Unique transaction ID
+      payerName: null, // Company name
+      payerId: null, // Company ID
+      paymentType: null, // 'PAYG', 'Add on', 'Starter Plan', 'Custom Plan'
+      amount: 0, // OMR
+      paymentDate: null,
+      validity: null, // Validity period
+      lpoNumber: null, // LPO Number
+      lpoIssuedDate: null, // LPO Issued Date
+      paymentStatus: null, // 'pending', 'completed', 'failed', 'refunded'
+      transactionReference: null // External reference
+    };
     
     // OMAN BANK API INTEGRATION
     this.bankDetails = data.bankDetails || {
@@ -54,7 +301,7 @@ class Company {
       isVerified: false
     };
     this.withdrawalSettings = data.withdrawalSettings || {
-      method: 'bank', // 'bank', 'paypal', 'stripe'
+      method: 'bank',
       minAmount: 50,
       autoWithdraw: false
     };
@@ -64,14 +311,52 @@ class Company {
     this.walletHistory = data.walletHistory || []; // Credit transactions
     this.pendingCredits = data.pendingCredits || 0; // Credits after CR validation
     
-    // USAGE & LIMITS
+    // USAGE & LIMITS (Enhanced Analytics)
     this.usageStats = data.usageStats || {
       instantMatches: 0,
       interviews: 0,
       jobPostings: 0,
-      monthlyReset: new Date().toISOString()
+      monthlyReset: new Date().toISOString(),
+      dailyUsage: {},
+      weeklyTrends: [],
+      monthlyTrends: [],
+      peakUsageHours: [],
+      conversionRates: {
+        matchToInterview: 0,
+        interviewToHire: 0,
+        overallConversion: 0
+      }
     };
     this.planLimits = data.planLimits || this.getPlanLimits();
+    
+    // Advanced Usage Analytics
+    this.analyticsData = data.analyticsData || {
+      hiringFunnel: {
+        jobPostings: 0,
+        applications: 0,
+        screenings: 0,
+        interviews: 0,
+        offers: 0,
+        hires: 0
+      },
+      timeToHire: {
+        average: 0,
+        median: 0,
+        fastest: null,
+        slowest: null
+      },
+      costAnalysis: {
+        averageCostPerHire: 0,
+        totalHiringCost: 0,
+        costPerChannel: {},
+        budgetUtilization: 0
+      },
+      candidateQuality: {
+        averageScore: 0,
+        retentionRate: 0,
+        performanceRating: 0
+      }
+    };
     
     // STEP 5: Terms & Conditions
     this.termsAccepted = data.termsAccepted || false;
@@ -83,13 +368,13 @@ class Company {
     this.confirmedAt = data.confirmedAt || null;
     
     // VERIFICATION SYSTEM
-    this.crVerificationStatus = data.crVerificationStatus || 'pending'; // 'pending', 'verified', 'rejected'
+    this.crVerificationStatus = data.crVerificationStatus || 'pending';
     this.crVerifiedAt = data.crVerifiedAt || null;
     this.crVerificationNotes = data.crVerificationNotes || null;
     this.isVerified = data.isVerified || false;
     
     // PROFILE MANAGEMENT
-    this.profileCompletionStep = data.profileCompletionStep || 1; // 1-6 steps
+    this.profileCompletionStep = data.profileCompletionStep || 1;
     this.isProfileComplete = data.isProfileComplete || false;
     this.profileCompletionPercentage = data.profileCompletionPercentage || 0;
     
@@ -113,32 +398,501 @@ class Company {
     this.averageRating = data.averageRating || 0;
     this.totalReviews = data.totalReviews || 0;
     
-    // METADATA
-    this.createdAt = data.createdAt || new Date().toISOString();
-    this.updatedAt = data.updatedAt || new Date().toISOString();
+    // Comprehensive Performance Dashboard
+    this.performanceDashboard = data.performanceDashboard || {
+      kpis: {
+        monthlyHires: 0,
+        quarterlyHires: 0,
+        yearlyHires: 0,
+        hiringVelocity: 0,
+        candidateQualityIndex: 0,
+        employerBrandScore: 0
+      },
+      trends: {
+        hiringTrend: 'stable',
+        seasonalPatterns: {},
+        industryComparison: {},
+        competitorAnalysis: {}
+      },
+      predictions: {
+        nextMonthHiring: 0,
+        budgetForecasting: 0,
+        trendPredictions: {},
+        recommendations: []
+      },
+      benchmarks: {
+        industryAverage: {},
+        topPerformers: {},
+        improvementAreas: [],
+        strengthAreas: []
+      }
+    };
+    
+    // HEALTH SCORE (Overall company performance rating)
+    this.healthScore = data.healthScore || 0; // 0-100
+    
+    // Timestamps
+    this.createdAt = data.createdAt || null;
+    this.updatedAt = data.updatedAt || null;
   }
   
   /**
-   * Calculate trial end date (14 days from start)
+   * Add payment transaction to history (Based on CSV structure)
+   */
+  async addPaymentTransaction(transactionData) {
+    try {
+      const transaction = {
+        transactionId: transactionData.transactionId || this.generateTransactionId(),
+        payerName: this.companyName,
+        payerId: this.id,
+        paymentType: transactionData.paymentType, // 'PAYG', 'Add on', 'Starter Plan', 'Custom Plan'
+        amount: transactionData.amount,
+        paymentDate: transactionData.paymentDate || new Date().toISOString(),
+        validity: transactionData.validity,
+        lpoNumber: transactionData.lpoNumber || null,
+        lpoIssuedDate: transactionData.lpoIssuedDate || null,
+        paymentStatus: transactionData.paymentStatus || 'completed',
+        transactionReference: transactionData.transactionReference || null,
+        createdAt: new Date().toISOString()
+      };
+
+      this.paymentHistory.push(transaction);
+      
+      // Update company analytics
+      this.companyAnalytics.totalSpentOnHiring += transaction.amount;
+      this.companyAnalytics.lastActiveDate = new Date().toISOString();
+      
+      // Update usage based on payment type
+      await this.updateUsageFromPayment(transaction);
+      
+      await this.update({
+        paymentHistory: this.paymentHistory,
+        companyAnalytics: this.companyAnalytics
+      });
+
+      return transaction;
+    } catch (error) {
+      console.error('Error adding payment transaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate unique transaction ID
+   */
+  generateTransactionId() {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `TXN-${timestamp}-${random}`;
+  }
+
+  /**
+   * Update usage based on payment type
+   */
+  async updateUsageFromPayment(transaction) {
+    switch (transaction.paymentType) {
+      case 'PAYG':
+        // Pay as you go - instant matches
+        this.usageStats.instantMatches += Math.floor(transaction.amount / 5); // 5 OMR per match
+        break;
+      case 'Add on':
+        // Interview packages
+        const interviewPackage = this.pricingDetails.payAsYouGo.pricing.interviewPackages.find(p => p.price === transaction.amount);
+        if (interviewPackage) {
+          this.usageStats.interviews += interviewPackage.interviews;
+        }
+        break;
+      case 'Starter Plan':
+        // Starter bundle
+        this.subscriptionPlan = 'starter';
+        this.planLimits = this.getPlanLimits();
+        this.nextBillingDate = new Date(Date.now() + (6 * 30 * 24 * 60 * 60 * 1000)).toISOString(); // 6 months
+        break;
+      case 'Pro Bundle':
+        // Pro bundle
+        this.subscriptionPlan = 'pro';
+        this.planLimits = this.getPlanLimits();
+        this.nextBillingDate = new Date(Date.now() + (12 * 30 * 24 * 60 * 60 * 1000)).toISOString(); // 12 months
+        break;
+      case 'Custom Plan':
+        // Custom plan
+        this.subscriptionPlan = 'custom';
+        this.planLimits = this.getPlanLimits();
+        break;
+    }
+  }
+
+  /**
+   * Get payment history with filtering
+   */
+  getPaymentHistory(filters = {}) {
+    let history = [...this.paymentHistory];
+
+    // Filter by payment type
+    if (filters.paymentType) {
+      history = history.filter(t => t.paymentType === filters.paymentType);
+    }
+
+    // Filter by date range
+    if (filters.startDate) {
+      history = history.filter(t => new Date(t.paymentDate) >= new Date(filters.startDate));
+    }
+    if (filters.endDate) {
+      history = history.filter(t => new Date(t.paymentDate) <= new Date(filters.endDate));
+    }
+
+    // Filter by status
+    if (filters.status) {
+      history = history.filter(t => t.paymentStatus === filters.status);
+    }
+
+    // Sort by date (newest first)
+    history.sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate));
+
+    return history;
+  }
+
+  /**
+   * Get payment statistics
+   */
+  getPaymentStats() {
+    const totalSpent = this.paymentHistory.reduce((sum, t) => sum + t.amount, 0);
+    const totalTransactions = this.paymentHistory.length;
+    
+    const statsByType = this.paymentHistory.reduce((acc, t) => {
+      if (!acc[t.paymentType]) {
+        acc[t.paymentType] = { count: 0, amount: 0 };
+      }
+      acc[t.paymentType].count++;
+      acc[t.paymentType].amount += t.amount;
+      return acc;
+    }, {});
+
+    return {
+      totalSpent,
+      totalTransactions,
+      averageTransactionAmount: totalTransactions > 0 ? totalSpent / totalTransactions : 0,
+      statsByType,
+      lastPaymentDate: this.paymentHistory.length > 0 ? this.paymentHistory[0].paymentDate : null
+    };
+  }
+
+  /**
+   * Get CSV-compatible company data
+   */
+  getCSVData() {
+    return {
+      companyNumber: this.companyNumber || this.id,
+      companyName: this.companyName,
+      companyCR: this.crNumber,
+      admin: this.adminDetails?.fullName,
+      adminPhoneNumber: this.adminDetails?.phone,
+      adminEmail: this.adminDetails?.email,
+      industry: this.industry || this.industryDetails?.primaryIndustry,
+      roles: Array.isArray(this.roles) ? this.roles.join(', ') : this.roles,
+      registrationDate: this.registrationDate,
+      numberOfBands: this.numberOfBands,
+      numberOfBranches: this.numberOfBranches,
+      lastActiveDate: this.lastActiveDate || this.companyAnalytics?.lastActiveDate,
+      numberOfJobPosts: this.numberOfJobPosts || this.totalJobsPosted,
+      totalInstantHires: this.totalInstantHires || this.successfulMatches,
+      totalInterviews: this.totalInterviews || this.companyAnalytics?.totalInterviews,
+      spentOnHiring: this.spentOnHiring || this.companyAnalytics?.totalSpentOnHiring,
+      usedFreeTrial: this.usedFreeTrial || this.companyAnalytics?.hasUsedFreeTrial,
+      previousPlansPurchases: Array.isArray(this.previousPlansPurchases) ? this.previousPlansPurchases.join(', ') : this.previousPlansPurchases
+    };
+  }
+
+  /**
+   * Update company data from CSV
+   */
+  async updateFromCSV(csvData) {
+    const updateData = {
+      companyNumber: csvData.companyNumber || csvData['No.'],
+      companyName: csvData.companyName || csvData['Company Name'],
+      crNumber: csvData.companyCR || csvData['Company CR'],
+      industry: csvData.industry || csvData['Industry'],
+      roles: csvData.roles || csvData['Roles'],
+      registrationDate: csvData.registrationDate || csvData['Registration Date'],
+      numberOfBands: parseInt(csvData.numberOfBands || csvData['No. of Bands / Business Entities']) || 1,
+      numberOfBranches: parseInt(csvData.numberOfBranches || csvData['No. of Branches']) || 1,
+      lastActiveDate: csvData.lastActiveDate || csvData['Last Active Date'],
+      numberOfJobPosts: parseInt(csvData.numberOfJobPosts || csvData['Number of Job Posts']) || 0,
+      totalInstantHires: parseInt(csvData.totalInstantHires || csvData['Total Instant Hires']) || 0,
+      totalInterviews: parseInt(csvData.totalInterviews || csvData['Total Interviews']) || 0,
+      spentOnHiring: parseFloat(csvData.spentOnHiring || csvData['Spent on Hiring']) || 0,
+      usedFreeTrial: csvData.usedFreeTrial === 'true' || csvData['Used Free Trial?'] === 'true',
+      previousPlansPurchases: csvData.previousPlansPurchases || csvData['Previous Plans Purchases']
+    };
+
+    // Update admin details if provided
+    if (csvData.admin || csvData['Admin']) {
+      updateData.adminDetails = {
+        ...this.adminDetails,
+        fullName: csvData.admin || csvData['Admin'],
+        phone: csvData.adminPhoneNumber || csvData['Admin Phone Number'],
+        email: csvData.adminEmail || csvData['Admin Email']
+      };
+    }
+
+    return await this.update(updateData);
+  }
+
+  /**
+   * Get company statistics for reporting
+   */
+  getCompanyStats() {
+    return {
+      // Basic company info
+      companyNumber: this.companyNumber,
+      companyName: this.companyName,
+      crNumber: this.crNumber,
+      industry: this.industry,
+      
+      // Admin information
+      admin: this.adminDetails?.fullName,
+      adminPhone: this.adminDetails?.phone,
+      adminEmail: this.adminDetails?.email,
+      
+      // Business structure
+      numberOfBands: this.numberOfBands,
+      numberOfBranches: this.numberOfBranches,
+      totalBusinessEntities: this.numberOfBands,
+      
+      // Activity metrics
+      registrationDate: this.registrationDate,
+      lastActiveDate: this.lastActiveDate,
+      daysSinceRegistration: this.registrationDate ? Math.floor((new Date() - new Date(this.registrationDate)) / (1000 * 60 * 60 * 24)) : 0,
+      daysSinceLastActive: this.lastActiveDate ? Math.floor((new Date() - new Date(this.lastActiveDate)) / (1000 * 60 * 60 * 24)) : 0,
+      
+      // Hiring metrics
+      totalJobPosts: this.numberOfJobPosts,
+      totalInstantHires: this.totalInstantHires,
+      totalInterviews: this.totalInterviews,
+      spentOnHiring: this.spentOnHiring,
+      
+      // Subscription info
+      usedFreeTrial: this.usedFreeTrial,
+      previousPlansPurchases: this.previousPlansPurchases,
+      currentSubscriptionPlan: this.subscriptionPlan,
+      subscriptionStatus: this.getSubscriptionStatus(),
+      
+      // Performance metrics
+      hireSuccessRate: this.totalJobPosts > 0 ? (this.totalInstantHires / this.totalJobPosts) * 100 : 0,
+      averageCostPerHire: this.totalInstantHires > 0 ? this.spentOnHiring / this.totalInstantHires : 0,
+      interviewToHireRatio: this.totalInstantHires > 0 ? this.totalInterviews / this.totalInstantHires : 0
+    };
+  }
+
+  /**
+   * Get current pricing plans
+   */
+  getCurrentPricingPlans() {
+    return {
+      freeTrial: this.pricingDetails.freeTrial,
+      payAsYouGo: this.pricingDetails.payAsYouGo,
+      subscriptionPlans: this.pricingDetails.subscriptionPlans,
+      customPlans: this.pricingDetails.customPlans
+    };
+  }
+
+  /**
+   * Get recommended plan based on usage
+   */
+  getRecommendedPlan() {
+    const monthlyMatches = this.usageStats.instantMatches;
+    const monthlyInterviews = this.usageStats.interviews;
+    
+    if (monthlyMatches <= 5 && monthlyInterviews <= 5) {
+      return {
+        recommended: 'payAsYouGo',
+        reason: 'Low usage - Pay as you go is most cost-effective',
+        estimatedMonthlyCost: (monthlyMatches * 5) + (monthlyInterviews * 5)
+      };
+    } else if (monthlyMatches <= 20 && monthlyInterviews <= 20) {
+      return {
+        recommended: 'starter',
+        reason: 'Moderate usage - Starter bundle offers best value',
+        estimatedMonthlyCost: 99 / 6, // 99 OMR for 6 months
+        savings: '50% compared to pay-as-you-go'
+      };
+    } else {
+      return {
+        recommended: 'pro',
+        reason: 'High usage - Pro bundle offers maximum savings',
+        estimatedMonthlyCost: 200 / 12, // 200 OMR for 12 months
+        savings: '60% compared to pay-as-you-go'
+      };
+    }
+  }
+
+  /**
+   * Calculate trial end date
    */
   calculateTrialEndDate() {
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 14);
-    return endDate.toISOString();
+    const trialStart = new Date(this.trialStartDate);
+    const trialEnd = new Date(trialStart.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days
+    return trialEnd.toISOString();
   }
-  
+
   /**
-   * Get plan limits based on subscription
+   * Get plan limits based on current subscription
    */
   getPlanLimits() {
-    const limits = {
-      trial: { locations: 1, instantMatches: 10, interviews: 5, jobPostings: 3 },
-      starter: { locations: 1, instantMatches: 20, interviews: 50, jobPostings: 10 },
-      professional: { locations: 3, instantMatches: 50, interviews: 100, jobPostings: 25 },
-      custom: { locations: 99, instantMatches: 999, interviews: 999, jobPostings: 99 }
+    switch (this.subscriptionPlan) {
+      case 'trial':
+        return {
+          instantMatches: 'unlimited',
+          interviews: 'unlimited',
+          locations: 1,
+          jobPostings: 'unlimited',
+          teamMembers: 1,
+          analytics: 'basic',
+          support: 'email'
+        };
+      case 'starter':
+        return {
+          instantMatches: 20,
+          interviews: 20,
+          locations: 1,
+          jobPostings: 'unlimited',
+          teamMembers: 3,
+          analytics: 'basic',
+          support: 'email'
+        };
+      case 'pro':
+        return {
+          instantMatches: 50,
+          interviews: 50,
+          locations: 1,
+          jobPostings: 'unlimited',
+          teamMembers: 10,
+          analytics: 'advanced',
+          support: 'priority'
+        };
+      case 'custom':
+        return {
+          instantMatches: 'unlimited',
+          interviews: 'unlimited',
+          locations: 'unlimited',
+          jobPostings: 'unlimited',
+          teamMembers: 'unlimited',
+          analytics: 'enterprise',
+          support: 'dedicated'
+        };
+      default:
+        return {
+          instantMatches: 0,
+          interviews: 0,
+          locations: 1,
+          jobPostings: 0,
+          teamMembers: 1,
+          analytics: 'none',
+          support: 'none'
+        };
+    }
+  }
+
+  /**
+   * Get trial status
+   */
+  getTrialStatus() {
+    const now = new Date();
+    const trialEnd = new Date(this.trialEndDate);
+    const daysRemaining = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24));
+    
+    return {
+      isActive: !this.trialExpired && daysRemaining > 0,
+      daysRemaining: Math.max(0, daysRemaining),
+      startDate: this.trialStartDate,
+      endDate: this.trialEndDate,
+      expired: this.trialExpired || daysRemaining <= 0
     };
-    return limits[this.subscriptionPlan] || limits.trial;
+  }
+
+  /**
+   * Get subscription status
+   */
+  getSubscriptionStatus() {
+    if (this.subscriptionPlan === 'trial') {
+      const trialStatus = this.getTrialStatus();
+      return trialStatus.isActive ? 'trial' : 'expired';
+    }
+    
+    if (this.subscriptionPlan === 'payAsYouGo') {
+      return 'active';
+    }
+    
+    if (this.nextBillingDate) {
+      const now = new Date();
+      const billingDate = new Date(this.nextBillingDate);
+      return billingDate > now ? 'active' : 'expired';
+    }
+    
+    return 'inactive';
+  }
+
+  /**
+   * Check if company can perform action based on plan limits
+   */
+  canPerformAction(action) {
+    const limits = this.getPlanLimits();
+    
+    switch (action) {
+      case 'instant_match':
+        if (limits.instantMatches === 'unlimited') return true;
+        return this.usageStats.instantMatches < limits.instantMatches;
+      
+      case 'interview':
+        if (limits.interviews === 'unlimited') return true;
+        return this.usageStats.interviews < limits.interviews;
+      
+      case 'add_location':
+        if (limits.locations === 'unlimited') return true;
+        return this.locations.length < limits.locations;
+      
+      case 'add_team_member':
+        if (limits.teamMembers === 'unlimited') return true;
+        return this.teamMembers.length < limits.teamMembers;
+      
+      case 'job_posting':
+        if (limits.jobPostings === 'unlimited') return true;
+        return this.totalJobsPosted < limits.jobPostings;
+      
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Calculate completion percentage
+   */
+  calculateCompletionPercentage() {
+    const requiredFields = [
+      'companyName',
+      'crNumber',
+      'adminDetails.fullName',
+      'adminDetails.email',
+      'adminDetails.phone',
+      'industryDetails.primaryIndustry'
+    ];
+    
+    let completedFields = 0;
+    requiredFields.forEach(field => {
+      const value = this.getNestedValue(field);
+      if (value && value.toString().trim() !== '') {
+        completedFields++;
+      }
+    });
+    
+    return Math.round((completedFields / requiredFields.length) * 100);
+  }
+
+  /**
+   * Get nested object value
+   */
+  getNestedValue(path) {
+    return path.split('.').reduce((obj, key) => obj && obj[key], this);
   }
 
   /**
@@ -152,11 +906,13 @@ class Company {
         ...companyData
       });
 
-      // Calculate trial days remaining
-      await company.updateTrialStatus();
-
       const result = await databaseService.create(COLLECTIONS.COMPANIES, company.toJSON());
-      return new Company({ id: result.id, ...result });
+      const createdCompany = new Company({ id: result.id, ...result });
+      
+      // Calculate trial days remaining after creation
+      await createdCompany.updateTrialStatus();
+      
+      return createdCompany;
     } catch (error) {
       console.error('Error creating company profile:', error);
       throw error;
@@ -503,57 +1259,6 @@ class Company {
   }
 
   /**
-   * Get subscription status for display
-   */
-  getSubscriptionStatus() {
-    if (this.trialExpired && this.subscriptionStatus === 'expired') {
-      return 'trial_expired';
-    }
-    if (this.subscriptionStatus === 'trial' && this.trialDaysRemaining > 0) {
-      return 'trial_active';
-    }
-    return this.subscriptionStatus;
-  }
-
-  /**
-   * Check if company can perform action based on plan limits
-   */
-  canPerformAction(action) {
-    const limits = this.planLimits;
-    const usage = this.usageStats;
-
-    switch (action) {
-      case 'add_location':
-        return this.locations.length < this.maxLocations;
-      case 'instant_match':
-        return usage.instantMatches < limits.instantMatches;
-      case 'interview':
-        return usage.interviews < limits.interviews;
-      case 'job_posting':
-        return usage.jobPostings < limits.jobPostings;
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Calculate profile completion percentage
-   */
-  calculateCompletionPercentage() {
-    const steps = [
-      { step: 1, completed: this.companyName && this.crNumber && this.adminDetails.fullName },
-      { step: 2, completed: this.brands.length > 0 },
-      { step: 3, completed: this.locations.length > 0 },
-      { step: 4, completed: true }, // Plan step is always completed
-      { step: 5, completed: this.termsAccepted },
-      { step: 6, completed: this.profileConfirmed }
-    ];
-
-    const completedSteps = steps.filter(s => s.completed).length;
-    return Math.round((completedSteps / steps.length) * 100);
-  }
-
-  /**
    * Create company profile from onboarding data
    */
   static async createFromOnboarding(userId, companyData, onboardingData) {
@@ -612,7 +1317,7 @@ class Company {
   static async findByRegistrationNumber(crNumber) {
     try {
       const companies = await databaseService.query(COLLECTIONS.COMPANIES, [
-        { field: 'commercialRegistrationNumber', operator: '==', value: crNumber }
+        { field: 'crNumber', operator: '==', value: crNumber }
       ]);
 
       return companies.length > 0 ? new Company(companies[0]) : null;
@@ -771,7 +1476,7 @@ class Company {
    */
   getProfileCompletionPercentage() {
     const requiredFields = [
-      'companyName', 'commercialRegistrationNumber', 'primaryIndustry',
+      'companyName', 'crNumber', 'primaryIndustry',
       'companyEmail', 'companyPhone', 'headquarters'
     ];
     
@@ -786,27 +1491,49 @@ class Company {
   }
 
   /**
-   * Convert to JSON for database storage
+   * Convert to JSON for database storage (Complete with all enhancements)
    */
   toJSON() {
     return {
       userId: this.userId,
       
-      // Company Information & Admin
+      // Company Information & Admin (CSV-compatible)
       companyName: this.companyName,
       crNumber: this.crNumber,
+      companyNumber: this.companyNumber,
       adminDetails: this.adminDetails,
+      
+      // CSV-specific fields
+      industry: this.industry,
+      roles: this.roles,
+      registrationDate: this.registrationDate,
+      numberOfBands: this.numberOfBands,
+      numberOfBranches: this.numberOfBranches,
+      lastActiveDate: this.lastActiveDate,
+      numberOfJobPosts: this.numberOfJobPosts,
+      totalInstantHires: this.totalInstantHires,
+      totalInterviews: this.totalInterviews,
+      spentOnHiring: this.spentOnHiring,
+      usedFreeTrial: this.usedFreeTrial,
+      previousPlansPurchases: this.previousPlansPurchases,
+      
+      // Enhanced Analytics & Structure
+      companyAnalytics: this.companyAnalytics,
+      industryDetails: this.industryDetails,
+      organizationStructure: this.organizationStructure,
       
       // Business Details
       brands: this.brands,
       primaryBrand: this.primaryBrand,
+      brandPortfolio: this.brandPortfolio,
       locations: this.locations,
       teamMembers: this.teamMembers,
       maxLocations: this.maxLocations,
       
-      // Subscription & Payment
+      // Subscription & Payment with Enhanced Pricing
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.subscriptionStatus,
+      pricingDetails: this.pricingDetails,
       trialStartDate: this.trialStartDate,
       trialEndDate: this.trialEndDate,
       trialDaysRemaining: this.trialDaysRemaining,
@@ -824,9 +1551,14 @@ class Company {
       walletHistory: this.walletHistory,
       pendingCredits: this.pendingCredits,
       
-      // Usage & Limits
+      // Usage & Limits with Analytics
       usageStats: this.usageStats,
       planLimits: this.planLimits,
+      analyticsData: this.analyticsData,
+      
+      // Performance Dashboard & Health Score
+      performanceDashboard: this.performanceDashboard,
+      healthScore: this.healthScore,
       
       // Terms & Profile
       termsAccepted: this.termsAccepted,
@@ -873,15 +1605,45 @@ class Company {
   }
 
   /**
-   * Convert to public JSON (safe for API responses)
+   * Convert to public JSON (safe for API responses with comprehensive data)
    */
   toPublicJSON() {
     return {
       id: this.id,
       userId: this.userId,
       
-      // Basic company info
+      // Basic company info (CSV-compatible)
       companyName: this.companyName,
+      companyNumber: this.companyNumber,
+      crNumber: this.crNumber,
+      
+      // Admin information
+      adminDetails: {
+        fullName: this.adminDetails?.fullName,
+        phone: this.adminDetails?.phone,
+        email: this.adminDetails?.email,
+        role: this.adminDetails?.role
+      },
+      
+      // Business structure
+      numberOfBands: this.numberOfBands,
+      numberOfBranches: this.numberOfBranches,
+      
+      // Activity metrics
+      registrationDate: this.registrationDate,
+      lastActiveDate: this.lastActiveDate,
+      
+      // Hiring metrics
+      numberOfJobPosts: this.numberOfJobPosts,
+      totalInstantHires: this.totalInstantHires,
+      totalInterviews: this.totalInterviews,
+      spentOnHiring: this.spentOnHiring,
+      
+      // Subscription info
+      usedFreeTrial: this.usedFreeTrial,
+      previousPlansPurchases: this.previousPlansPurchases,
+      
+      // Brands and branding
       brands: this.brands.map(brand => ({
         id: brand.id,
         name: brand.name,
@@ -890,11 +1652,51 @@ class Company {
       })),
       primaryBrand: this.primaryBrand,
       
-      // Subscription info
+      // Industry & Organization Info
+      industryDetails: {
+        primaryIndustry: this.industryDetails.primaryIndustry,
+        businessType: this.industryDetails.businessType,
+        industrySize: this.industryDetails.industrySize
+      },
+      organizationStructure: {
+        numberOfBands: this.organizationStructure.numberOfBands,
+        numberOfBranches: this.organizationStructure.numberOfBranches,
+        operationalScale: this.organizationStructure.operationalScale
+      },
+      
+      // Subscription info with pricing details
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.getSubscriptionStatus(),
       trialDaysRemaining: this.trialDaysRemaining,
       trialExpired: this.trialExpired,
+      trialStatus: this.getTrialStatus(),
+      planLimits: this.getPlanLimits(),
+      
+      // Usage Statistics (Safe subset)
+      usageStats: {
+        instantMatches: this.usageStats.instantMatches,
+        interviews: this.usageStats.interviews,
+        jobPostings: this.usageStats.jobPostings,
+        conversionRates: this.usageStats.conversionRates
+      },
+      
+      // Performance Dashboard (Public metrics)
+      performanceMetrics: {
+        totalJobsPosted: this.totalJobsPosted,
+        averageRating: this.averageRating,
+        totalReviews: this.totalReviews,
+        hiringVelocity: this.performanceDashboard.kpis.hiringVelocity,
+        employerBrandScore: this.performanceDashboard.kpis.employerBrandScore
+      },
+      
+      // Health Score (Public view)
+      healthScore: {
+        overall: this.healthScore,
+        categories: {
+          hiringEfficiency: 0, // Placeholder, needs actual implementation
+          candidateExperience: 0 // Placeholder, needs actual implementation
+        }
+      },
       
       // Verification status
       isVerified: this.isVerified,
@@ -905,14 +1707,19 @@ class Company {
       isProfileComplete: this.isProfileComplete,
       profileCompletionPercentage: this.calculateCompletionPercentage(),
       
-      // Performance metrics
-      totalJobsPosted: this.totalJobsPosted,
-      averageRating: this.averageRating,
-      totalReviews: this.totalReviews,
-      
       // System status
       isActive: this.isActive,
       isSuspended: this.isSuspended,
+      
+      // Company Analytics (Public safe)
+      companyAnalytics: {
+        registrationDate: this.companyAnalytics.registrationDate,
+        hasUsedFreeTrial: this.companyAnalytics.hasUsedFreeTrial,
+        performanceMetrics: {
+          hireSuccessRate: this.companyAnalytics.performanceMetrics.hireSuccessRate,
+          candidateQualityScore: this.companyAnalytics.performanceMetrics.candidateQualityScore
+        }
+      },
       
       // Timestamps
       createdAt: this.createdAt,
@@ -921,24 +1728,48 @@ class Company {
   }
 
   /**
-   * Convert to detailed JSON for admin/management
+   * Convert to detailed JSON for admin/management (Comprehensive)
    */
   toDetailedJSON() {
     return {
       id: this.id,
       userId: this.userId,
       
-      // Complete company information
+      // Complete company information (CSV-compatible)
       companyName: this.companyName,
+      companyNumber: this.companyNumber,
       crNumber: this.crNumber,
       adminDetails: this.adminDetails,
+      
+      // CSV-specific fields
+      industry: this.industry,
+      roles: this.roles,
+      registrationDate: this.registrationDate,
+      numberOfBands: this.numberOfBands,
+      numberOfBranches: this.numberOfBranches,
+      lastActiveDate: this.lastActiveDate,
+      numberOfJobPosts: this.numberOfJobPosts,
+      totalInstantHires: this.totalInstantHires,
+      totalInterviews: this.totalInterviews,
+      spentOnHiring: this.spentOnHiring,
+      usedFreeTrial: this.usedFreeTrial,
+      previousPlansPurchases: this.previousPlansPurchases,
+      
+      // Business structure
       brands: this.brands,
       locations: this.locations,
       teamMembers: this.teamMembers,
       
-      // Complete subscription details
+      // Enhanced Company Analytics
+      companyAnalytics: this.companyAnalytics,
+      industryDetails: this.industryDetails,
+      organizationStructure: this.organizationStructure,
+      brandPortfolio: this.brandPortfolio,
+      
+      // Complete subscription details with pricing model
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.subscriptionStatus,
+      pricingDetails: this.pricingDetails,
       trialStartDate: this.trialStartDate,
       trialEndDate: this.trialEndDate,
       trialDaysRemaining: this.trialDaysRemaining,
@@ -952,6 +1783,11 @@ class Company {
       pendingCredits: this.pendingCredits,
       usageStats: this.usageStats,
       planLimits: this.planLimits,
+      analyticsData: this.analyticsData,
+      
+      // Performance Dashboard
+      performanceDashboard: this.performanceDashboard,
+      healthScore: this.healthScore,
       
       // Verification details
       crVerificationStatus: this.crVerificationStatus,
@@ -983,6 +1819,9 @@ class Company {
       successfulMatches: this.successfulMatches,
       averageRating: this.averageRating,
       totalReviews: this.totalReviews,
+      
+      // Real-time trial status
+      trialStatus: this.getTrialStatus(),
       
       // Timestamps
       createdAt: this.createdAt,

@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const { validationResult } = require('express-validator');
+const { sendOTP, verifyOTP, generateTokenPair } = require('../utils/auth');
 
 /**
  * Phone Number Controller
@@ -55,12 +56,23 @@ class PhoneController {
       const newUser = await User.createWithPhone({
         phoneNumber,
         countryCode: cleanCountryCode,
-        userType
+        userType: userType || null // Allow null userType, will be set later in onboarding
       });
+
+      // Send OTP to the phone number
+      const otpResult = await sendOTP(phoneNumber, cleanCountryCode);
+
+      if (!otpResult.success) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to send OTP',
+          error: otpResult.error
+        });
+      }
 
       res.status(201).json({
         success: true,
-        message: 'Phone number registered successfully',
+        message: 'Phone number registered and OTP sent successfully',
         data: {
           userId: newUser.id,
           phoneNumber: newUser.phoneNumber,
@@ -70,7 +82,8 @@ class PhoneController {
           onboardingCompleted: newUser.onboardingCompleted,
           profileCompleted: newUser.profileCompleted,
           createdAt: newUser.createdAt,
-          nextStep: 'otp_verification'
+          nextStep: 'otp_verification',
+          otpSent: true
         }
       });
 
@@ -155,11 +168,13 @@ class PhoneController {
     }
   }
 
+
+
   /**
-   * Update phone verification status
-   * PUT /api/phone/verify
+   * Send OTP to existing user
+   * POST /api/phone/send-otp
    */
-  static async verifyPhone(req, res) {
+  static async sendOTP(req, res) {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -170,9 +185,19 @@ class PhoneController {
         });
       }
 
-      const { userId, verified } = req.body;
+      const { phoneNumber, countryCode } = req.body;
 
-      const user = await User.findById(userId);
+      // Handle URL encoding issue where + becomes space
+      let cleanCountryCode = (countryCode || '+968').trim();
+      if (cleanCountryCode.match(/^\s\d+$/)) {
+        cleanCountryCode = '+' + cleanCountryCode.trim();
+      }
+      if (cleanCountryCode && !cleanCountryCode.startsWith('+')) {
+        cleanCountryCode = '+' + cleanCountryCode;
+      }
+
+      // Check if user exists
+      const user = await User.findByPhone(phoneNumber, cleanCountryCode);
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -180,12 +205,93 @@ class PhoneController {
         });
       }
 
+      // Send OTP
+      const otpResult = await sendOTP(phoneNumber, cleanCountryCode);
+
+      if (!otpResult.success) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to send OTP',
+          error: otpResult.error
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'OTP sent successfully',
+        data: {
+          userId: user.id,
+          phoneNumber: user.phoneNumber,
+          countryCode: user.countryCode,
+          otpSent: true
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in sendOTP:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Verify OTP and generate JWT tokens
+   * POST /api/phone/verify-otp
+   */
+  static async verifyOTP(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { phoneNumber, countryCode, otp } = req.body;
+
+      // Handle URL encoding issue where + becomes space
+      let cleanCountryCode = (countryCode || '+968').trim();
+      if (cleanCountryCode.match(/^\s\d+$/)) {
+        cleanCountryCode = '+' + cleanCountryCode.trim();
+      }
+      if (cleanCountryCode && !cleanCountryCode.startsWith('+')) {
+        cleanCountryCode = '+' + cleanCountryCode;
+      }
+
+      // Verify OTP
+      const otpResult = await verifyOTP(phoneNumber, otp);
+      if (!otpResult.valid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid OTP',
+          error: otpResult.error
+        });
+      }
+
+      // Get user
+      const user = await User.findByPhone(phoneNumber, cleanCountryCode);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Update user verification status
       await user.update({ 
-        isPhoneVerified: verified,
+        isPhoneVerified: true,
         lastLoginAt: new Date().toISOString()
       });
 
-      // Determine next step based on verification and completion status
+      // Generate JWT tokens
+      const tokens = generateTokenPair(user.id, user.userType);
+
+      // Determine next step based on completion status
       let nextStep = 'onboarding';
       if (user.onboardingCompleted && !user.profileCompleted) {
         nextStep = 'profile_creation';
@@ -195,19 +301,82 @@ class PhoneController {
 
       res.status(200).json({
         success: true,
-        message: 'Phone verification status updated',
+        message: 'OTP verified successfully',
         data: {
           userId: user.id,
-          isPhoneVerified: user.isPhoneVerified,
-          lastLoginAt: user.lastLoginAt,
+          phoneNumber: user.phoneNumber,
+          countryCode: user.countryCode,
+          userType: user.userType,
+          isPhoneVerified: true,
           onboardingCompleted: user.onboardingCompleted,
           profileCompleted: user.profileCompleted,
-          nextStep: nextStep
+          nextStep: nextStep,
+          // JWT tokens
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          tokenType: tokens.tokenType,
+          expiresIn: tokens.expiresIn
         }
       });
 
     } catch (error) {
-      console.error('Error in verifyPhone:', error);
+      console.error('Error in verifyOTP:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Refresh access token using refresh token
+   * POST /api/phone/refresh-token
+   */
+  static async refreshToken(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Refresh token is required'
+        });
+      }
+
+      // Verify refresh token and generate new access token
+      const { refreshAccessToken } = require('../utils/auth');
+      const result = refreshAccessToken(refreshToken);
+
+      if (!result.success) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token',
+          error: result.error
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Access token refreshed successfully',
+        data: {
+          accessToken: result.accessToken,
+          tokenType: result.tokenType,
+          expiresIn: result.expiresIn
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in refreshToken:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -262,7 +431,7 @@ class PhoneController {
   }
 
   /**
-   * Update user type
+   * Update user type (token-based)
    * PUT /api/phone/user-type
    */
   static async updateUserType(req, res) {
@@ -276,7 +445,9 @@ class PhoneController {
         });
       }
 
-      const { userId, userType } = req.body;
+      // Get userId from token (set by auth middleware)
+      const { userId } = req.user;
+      const { userType } = req.body;
 
       const user = await User.findById(userId);
       if (!user) {

@@ -23,7 +23,9 @@ class OnboardingController {
         });
       }
 
-      const { userId, userType, ...onboardingData } = req.body;
+      // Get userId from token (set by auth middleware)
+      const { userId } = req.user;
+      const { userType, ...onboardingData } = req.body;
 
       // Verify user exists
       const user = await User.findById(userId);

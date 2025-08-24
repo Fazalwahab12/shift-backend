@@ -192,7 +192,6 @@ class Job {
    */
   toJSON() {
     return {
-      id: this.id,
       companyId: this.companyId,
       userId: this.userId,
       jobVenue: this.jobVenue,
@@ -296,7 +295,7 @@ class Job {
    */
   static async findById(jobId) {
     try {
-      const jobData = await databaseService.findById(COLLECTIONS.JOBS, jobId);
+      const jobData = await databaseService.getById(COLLECTIONS.JOBS, jobId);
       return jobData ? new Job(jobData) : null;
     } catch (error) {
       console.error('Error finding job:', error);
@@ -311,12 +310,12 @@ class Job {
     try {
       const jobs = await databaseService.query(
         COLLECTIONS.JOBS,
-        { companyId: companyId },
-        { 
-          orderBy: { field: 'createdAt', direction: 'desc' },
-          limit: limit,
-          offset: offset
-        }
+        [
+          { field: 'companyId', operator: '==', value: companyId },
+          { field: 'isActive', operator: '==', value: true }
+        ],
+        { field: 'createdAt', direction: 'desc' },
+        limit
       );
       return jobs.map(jobData => new Job(jobData));
     } catch (error) {
@@ -330,31 +329,31 @@ class Job {
    */
   static async searchJobs(filters = {}, limit = 20, offset = 0) {
     try {
-      const searchFilters = { jobStatus: 'published', isActive: true };
+      const searchFilters = [
+        { field: 'jobStatus', operator: '==', value: 'published' },
+        { field: 'isActive', operator: '==', value: true }
+      ];
       
       // Add location filter
       if (filters.governorate) {
-        searchFilters.governorate = filters.governorate;
+        searchFilters.push({ field: 'governorate', operator: '==', value: filters.governorate });
       }
       
       // Add role filter
       if (filters.role) {
-        searchFilters.roleName = filters.role;
+        searchFilters.push({ field: 'roleName', operator: '==', value: filters.role });
       }
       
       // Add hiring type filter
       if (filters.hiringType) {
-        searchFilters.hiringType = filters.hiringType;
+        searchFilters.push({ field: 'hiringType', operator: '==', value: filters.hiringType });
       }
       
       const jobs = await databaseService.query(
         COLLECTIONS.JOBS,
         searchFilters,
-        { 
-          orderBy: { field: 'publishedAt', direction: 'desc' },
-          limit: limit,
-          offset: offset
-        }
+        { field: 'publishedAt', direction: 'desc' },
+        limit
       );
       
       return jobs.map(jobData => new Job(jobData));
@@ -374,6 +373,7 @@ class Job {
         updatedAt: new Date().toISOString()
       };
       
+
       await databaseService.update(COLLECTIONS.JOBS, this.id, updatedData);
       
       // Update local instance
@@ -430,7 +430,13 @@ class Job {
    */
   static async getStats(companyId = null) {
     try {
-      const filters = companyId ? { companyId } : {};
+      const filters = companyId ? [
+        { field: 'companyId', operator: '==', value: companyId },
+        { field: 'isActive', operator: '==', value: true }
+      ] : [
+        { field: 'isActive', operator: '==', value: true }
+      ];
+      
       const allJobs = await databaseService.query(COLLECTIONS.JOBS, filters);
       
       const stats = {

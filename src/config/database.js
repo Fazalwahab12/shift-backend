@@ -71,8 +71,8 @@ class DatabaseService {
       });
       
       return {
-        id: docRef.id,
-        ...data
+        ...data,
+        id: docRef.id
       };
     } catch (error) {
       console.error(`Error creating document in ${collectionName}:`, error);

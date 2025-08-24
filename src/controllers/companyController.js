@@ -53,8 +53,8 @@ class CompanyController {
       }
 
       // Check if commercial registration number already exists
-      if (profileData.commercialRegistrationNumber) {
-        const existingCR = await Company.findByRegistrationNumber(profileData.commercialRegistrationNumber);
+      if (profileData.crNumber) {
+        const existingCR = await Company.findByRegistrationNumber(profileData.crNumber);
         if (existingCR) {
           return res.status(409).json({
             success: false,
@@ -190,9 +190,9 @@ class CompanyController {
       }
 
       // Check if commercial registration number is being updated and already exists
-      if (updateData.commercialRegistrationNumber && 
-          updateData.commercialRegistrationNumber !== company.commercialRegistrationNumber) {
-        const existingCR = await Company.findByRegistrationNumber(updateData.commercialRegistrationNumber);
+      if (updateData.crNumber && 
+          updateData.crNumber !== company.crNumber) {
+        const existingCR = await Company.findByRegistrationNumber(updateData.crNumber);
         if (existingCR) {
           return res.status(409).json({
             success: false,
@@ -391,7 +391,7 @@ class CompanyController {
           completionPercentage,
           missingFields: completionPercentage < 100 ? [
             !company.companyName && 'companyName',
-            !company.commercialRegistrationNumber && 'commercialRegistrationNumber',
+            !company.crNumber && 'crNumber',
             !company.primaryIndustry && 'primaryIndustry',
             !company.companyEmail && 'companyEmail',
             !company.companyPhone && 'companyPhone',
@@ -1122,13 +1122,22 @@ class CompanyController {
   }
 
   /**
-   * Get payment history
-   * GET /api/companies/:companyId/payment-history
+   * Add payment transaction
+   * POST /api/companies/:companyId/payment-transaction
    */
-  static async getPaymentHistory(req, res) {
+  static async addPaymentTransaction(req, res) {
     try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
       const { companyId } = req.params;
-      const { limit = 10, offset = 0 } = req.query;
+      const transactionData = req.body;
 
       const company = await Company.findById(companyId);
       if (!company) {
@@ -1138,23 +1147,273 @@ class CompanyController {
         });
       }
 
-      const paymentHistory = company.paymentHistory
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+      const transaction = await company.addPaymentTransaction(transactionData);
+
+      res.status(201).json({
+        success: true,
+        message: 'Payment transaction added successfully',
+        data: {
+          transaction,
+          updatedUsage: company.usageStats,
+          updatedAnalytics: {
+            totalSpent: company.companyAnalytics.totalSpentOnHiring,
+            lastActiveDate: company.companyAnalytics.lastActiveDate
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in addPaymentTransaction:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get payment history with filtering
+   * GET /api/companies/:companyId/payment-history
+   */
+  static async getPaymentHistory(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { paymentType, startDate, endDate, status, limit = 10, offset = 0 } = req.query;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const filters = {};
+      if (paymentType) filters.paymentType = paymentType;
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
+      if (status) filters.status = status;
+
+      const paymentHistory = company.getPaymentHistory(filters);
+      const paginatedHistory = paymentHistory.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
 
       res.status(200).json({
         success: true,
         message: 'Payment history retrieved successfully',
         data: {
-          paymentHistory,
-          totalTransactions: company.paymentHistory.length,
+          paymentHistory: paginatedHistory,
+          totalTransactions: paymentHistory.length,
           limit: parseInt(limit),
-          offset: parseInt(offset)
+          offset: parseInt(offset),
+          filters
         }
       });
 
     } catch (error) {
       console.error('Error in getPaymentHistory:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get payment statistics
+   * GET /api/companies/:companyId/payment-stats
+   */
+  static async getPaymentStats(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const paymentStats = company.getPaymentStats();
+
+      res.status(200).json({
+        success: true,
+        message: 'Payment statistics retrieved successfully',
+        data: paymentStats
+      });
+
+    } catch (error) {
+      console.error('Error in getPaymentStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get current pricing plans
+   * GET /api/companies/:companyId/pricing-plans
+   */
+  static async getPricingPlans(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const pricingPlans = company.getCurrentPricingPlans();
+      const recommendedPlan = company.getRecommendedPlan();
+
+      res.status(200).json({
+        success: true,
+        message: 'Pricing plans retrieved successfully',
+        data: {
+          pricingPlans,
+          recommendedPlan,
+          currentPlan: {
+            plan: company.subscriptionPlan,
+            status: company.getSubscriptionStatus(),
+            limits: company.getPlanLimits(),
+            usage: company.usageStats
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getPricingPlans:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get recommended plan based on usage
+   * GET /api/companies/:companyId/recommended-plan
+   */
+  static async getRecommendedPlan(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const recommendedPlan = company.getRecommendedPlan();
+
+      res.status(200).json({
+        success: true,
+        message: 'Recommended plan retrieved successfully',
+        data: {
+          recommendedPlan,
+          currentUsage: company.usageStats,
+          currentPlan: company.subscriptionPlan
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getRecommendedPlan:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Check if company can perform action
+   * GET /api/companies/:companyId/can-perform/:action
+   */
+  static async canPerformAction(req, res) {
+    try {
+      const { companyId, action } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const canPerform = company.canPerformAction(action);
+      const limits = company.getPlanLimits();
+      const usage = company.usageStats;
+
+      res.status(200).json({
+        success: true,
+        message: `Action ${action} check completed`,
+        data: {
+          canPerform,
+          action,
+          currentPlan: company.subscriptionPlan,
+          limits,
+          usage,
+          remaining: {
+            instantMatches: limits.instantMatches === 'unlimited' ? 'unlimited' : Math.max(0, limits.instantMatches - usage.instantMatches),
+            interviews: limits.interviews === 'unlimited' ? 'unlimited' : Math.max(0, limits.interviews - usage.interviews),
+            locations: limits.locations === 'unlimited' ? 'unlimited' : Math.max(0, limits.locations - company.locations.length),
+            teamMembers: limits.teamMembers === 'unlimited' ? 'unlimited' : Math.max(0, limits.teamMembers - company.teamMembers.length)
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in canPerformAction:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get trial status
+   * GET /api/companies/:companyId/trial-status
+   */
+  static async getTrialStatus(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const trialStatus = company.getTrialStatus();
+
+      res.status(200).json({
+        success: true,
+        message: 'Trial status retrieved successfully',
+        data: {
+          trialStatus,
+          subscriptionStatus: company.getSubscriptionStatus(),
+          currentPlan: company.subscriptionPlan
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getTrialStatus:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -1276,6 +1535,485 @@ class CompanyController {
 
     } catch (error) {
       console.error('Error in deleteProfile:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get comprehensive company analytics
+   * GET /api/companies/:companyId/analytics
+   */
+  static async getCompanyAnalytics(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { timeframe = '30d', metrics = 'all' } = req.query;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Update analytics before returning
+      await company.updateTrialStatus();
+
+      const analyticsData = {
+        companyId: company.id,
+        companyName: company.companyName,
+        timeframe,
+        
+        // Core metrics
+        coreMetrics: {
+          totalJobsPosted: company.totalJobsPosted,
+          totalHires: company.totalHires,
+          totalInterviews: company.companyAnalytics.totalInterviews,
+          totalInstantHires: company.companyAnalytics.totalInstantHires,
+          totalSpentOnHiring: company.companyAnalytics.totalSpentOnHiring,
+          averageRating: company.averageRating
+        },
+        
+        // Performance dashboard
+        performance: company.performanceDashboard,
+        
+        // Health score
+        healthScore: company.healthScore,
+        
+        // Usage analytics
+        usageAnalytics: {
+          currentMonth: company.usageStats,
+          trends: company.analyticsData,
+          conversionRates: company.usageStats.conversionRates
+        },
+        
+        // Subscription analytics
+        subscription: {
+          plan: company.subscriptionPlan,
+          status: company.getSubscriptionStatus(),
+          trialInfo: company.getTrialStatus(),
+          usage: {
+            instantMatches: company.usageStats.instantMatches,
+            interviews: company.usageStats.interviews,
+            jobPostings: company.usageStats.jobPostings
+          },
+          limits: company.getPlanLimits()
+        },
+        
+        // Financial summary
+        financial: {
+          creditBalance: company.creditBalance,
+          totalSpent: company.companyAnalytics.totalSpentOnHiring,
+          averageCostPerHire: company.analyticsData.costAnalysis.averageCostPerHire,
+          budgetUtilization: company.analyticsData.costAnalysis.budgetUtilization
+        },
+        
+        lastUpdated: new Date().toISOString()
+      };
+
+      res.status(200).json({
+        success: true,
+        message: 'Company analytics retrieved successfully',
+        data: analyticsData
+      });
+
+    } catch (error) {
+      console.error('Error in getCompanyAnalytics:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company data in CSV format
+   * GET /api/companies/:companyId/csv-data
+   */
+  static async getCompanyCSVData(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const csvData = company.getCSVData();
+
+      res.status(200).json({
+        success: true,
+        message: 'Company CSV data retrieved successfully',
+        data: csvData
+      });
+
+    } catch (error) {
+      console.error('Error in getCompanyCSVData:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Update company data from CSV
+   * PUT /api/companies/:companyId/csv-update
+   */
+  static async updateCompanyFromCSV(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const csvData = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      await company.updateFromCSV(csvData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Company data updated from CSV successfully',
+        data: company.getCSVData()
+      });
+
+    } catch (error) {
+      console.error('Error in updateCompanyFromCSV:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company statistics for reporting
+   * GET /api/companies/:companyId/stats
+   */
+  static async getCompanyStats(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const stats = company.getCompanyStats();
+
+      res.status(200).json({
+        success: true,
+        message: 'Company statistics retrieved successfully',
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error in getCompanyStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Export all companies data to CSV format
+   * GET /api/companies/export/csv
+   */
+  static async exportCompaniesToCSV(req, res) {
+    try {
+      const { limit = 1000, industry, usedFreeTrial } = req.query;
+
+      // Build search criteria
+      const searchCriteria = {};
+      if (industry) searchCriteria.industry = industry;
+      if (usedFreeTrial !== undefined) searchCriteria.usedFreeTrial = usedFreeTrial === 'true';
+
+      // Get companies
+      const companies = await Company.search(searchCriteria);
+      const limitedCompanies = companies.slice(0, parseInt(limit));
+
+      // Convert to CSV format
+      const csvData = limitedCompanies.map(company => company.getCSVData());
+
+      res.status(200).json({
+        success: true,
+        message: 'Companies exported to CSV format successfully',
+        data: {
+          companies: csvData,
+          count: csvData.length,
+          exportedAt: new Date().toISOString(),
+          filters: searchCriteria
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in exportCompaniesToCSV:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get performance dashboard
+   * GET /api/companies/:companyId/dashboard
+   */
+  static async getPerformanceDashboard(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      const dashboardData = {
+        companyInfo: {
+          id: company.id,
+          name: company.companyName,
+          industry: company.industryDetails.primaryIndustry,
+          size: company.organizationStructure.totalEmployees,
+          locations: company.organizationStructure.numberOfBranches
+        },
+        
+        // Key Performance Indicators
+        kpis: company.performanceDashboard.kpis,
+        
+        // Health score breakdown
+        healthScore: company.healthScore,
+        
+        // Current subscription status
+        subscription: {
+          plan: company.subscriptionPlan,
+          status: company.getSubscriptionStatus(),
+          trial: company.getTrialStatus(),
+          limits: company.getPlanLimits(),
+          usage: company.usageStats
+        },
+        
+        // Recent activity
+        recentActivity: {
+          lastActiveDate: company.companyAnalytics.lastActiveDate,
+          recentHires: company.performanceDashboard.kpis.monthlyHires,
+          activeJobs: company.activeJobs,
+          pendingInterviews: company.usageStats.interviews
+        },
+        
+        // Trends and insights
+        insights: {
+          trends: company.performanceDashboard.trends,
+          predictions: company.performanceDashboard.predictions,
+          recommendations: company.performanceDashboard.predictions.recommendations
+        },
+        
+        // Quick actions based on status
+        quickActions: company.subscriptionStatus === 'trial' ? [
+          'upgrade_subscription',
+          'add_payment_method',
+          'complete_profile'
+        ] : [
+          'post_job',
+          'review_candidates',
+          'view_analytics'
+        ],
+        
+        lastUpdated: new Date().toISOString()
+      };
+
+      res.status(200).json({
+        success: true,
+        message: 'Performance dashboard retrieved successfully',
+        data: dashboardData
+      });
+
+    } catch (error) {
+      console.error('Error in getPerformanceDashboard:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get pricing plans with real-time data
+   * GET /api/companies/pricing-plans
+   */
+  static async getPricingPlans(req, res) {
+    try {
+      const { currency = 'OMR' } = req.query;
+
+      const pricingPlans = {
+        currency,
+        
+        // Free trial (14 days)
+        freeTrial: {
+          name: 'Free Trial',
+          duration: 14,
+          durationUnit: 'days',
+          price: 0,
+          features: {
+            instantMatches: 'unlimited',
+            interviews: 'unlimited',
+            locations: 1,
+            fullAccess: true,
+            support: 'email'
+          },
+          benefits: [
+            'Full access to all features',
+            'Unlimited instant matches',
+            'Unlimited interviews',
+            'One location access',
+            'Email support'
+          ],
+          callToAction: 'Start Free Trial'
+        },
+        
+        // Pay as you go
+        payAsYouGo: {
+          name: 'Pay As You Go',
+          description: 'Only pay when you need to hire',
+          pricing: {
+            instantMatch: {
+              price: 5,
+              unit: 'per match',
+              currency
+            },
+            interviewPackages: [
+              {
+                name: 'Small Package',
+                interviews: 10,
+                price: 50,
+                validity: 4,
+                validityUnit: 'weeks',
+                savings: 0
+              },
+              {
+                name: 'Medium Package',
+                interviews: 20,
+                price: 80,
+                validity: 4,
+                validityUnit: 'weeks',
+                savings: 20
+              },
+              {
+                name: 'Large Package',
+                interviews: 50,
+                price: 250,
+                validity: 6,
+                validityUnit: 'weeks',
+                savings: 100
+              }
+            ]
+          },
+          benefits: [
+            'Pay only for what you use',
+            'No monthly commitments',
+            'Flexible hiring solutions',
+            'Interview packages with savings'
+          ],
+          callToAction: 'Start Hiring'
+        },
+        
+        // Subscription plans
+        subscriptionPlans: [
+          {
+            id: 'starter',
+            name: 'Starter Bundle',
+            price: 99,
+            originalPrice: 198,
+            currency,
+            savings: 50,
+            duration: 6,
+            durationUnit: 'months',
+            features: {
+              instantMatches: 20,
+              interviews: 20,
+              locations: 1,
+              analytics: 'basic',
+              support: 'email'
+            },
+            benefits: [
+              '20 Instant Matches',
+              '20 Interviews',
+              '1 Location',
+              'Save 50%',
+              'Valid for 6 months'
+            ],
+            popular: false,
+            callToAction: 'Get Started'
+          },
+          {
+            id: 'pro',
+            name: 'Pro Bundle',
+            price: 200,
+            originalPrice: 500,
+            currency,
+            savings: 60,
+            duration: 12,
+            durationUnit: 'months',
+            features: {
+              instantMatches: 50,
+              interviews: 50,
+              locations: 1,
+              analytics: 'advanced',
+              support: 'priority'
+            },
+            benefits: [
+              '50 Instant Matches',
+              '50 Interviews',
+              '1 Location',
+              'Save 60%',
+              'Valid for 12 months'
+            ],
+            popular: true,
+            callToAction: 'Get Pro'
+          }
+        ]
+      };
+
+      res.status(200).json({
+        success: true,
+        message: 'Pricing plans retrieved successfully',
+        data: pricingPlans
+      });
+
+    } catch (error) {
+      console.error('Error in getPricingPlans:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

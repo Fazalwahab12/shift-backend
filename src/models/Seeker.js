@@ -70,6 +70,24 @@ class Seeker {
     this.isSuspended = data.isSuspended || false;
     this.isPermanentlyBanned = data.isPermanentlyBanned || false;
     
+    // Activity & Statistics Fields (from CSV requirements)
+    this.totalJobsAppliedTo = data.totalJobsAppliedTo || 0; // Number of jobs applied to
+    this.numberOfHires = data.numberOfHires || 0; // Number of times hired
+    this.numberOfInterviews = data.numberOfInterviews || 0; // Number of interviews attended
+    this.numberOfNoShows = data.numberOfNoShows || 0; // Number of no-shows (different from strikeCount)
+    this.registrationDate = data.registrationDate || null; // When seeker registered (ISO string)
+    this.lastActiveDate = data.lastActiveDate || null; // Last activity date (ISO string)
+    
+    // Company Relations & Applications
+    this.applicationHistory = data.applicationHistory || []; // Array of job applications
+    this.interviewHistory = data.interviewHistory || []; // Array of interviews
+    this.hireHistory = data.hireHistory || []; // Array of hires/jobs completed
+    this.companyRatings = data.companyRatings || []; // Ratings received from companies
+    this.averageRating = data.averageRating || null; // Average rating from companies
+    
+    // CV File (missing from original model)
+    this.cvFile = data.cvFile || null; // CV file URL
+    
     // Metadata
     this.createdAt = data.createdAt || null;
     this.updatedAt = data.updatedAt || null;
@@ -82,6 +100,10 @@ class Seeker {
     try {
       const seeker = new Seeker({
         userId: userId,
+        registrationDate: new Date().toISOString(),
+        lastActiveDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         ...seekerData
       });
 
@@ -289,12 +311,153 @@ class Seeker {
       return await this.update({ 
         activityScore: newScore,
         lastLoginAt: new Date().toISOString(),
+        lastActiveDate: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
     } catch (error) {
       console.error('Error updating activity score:', error);
       throw error;
     }
+  }
+
+  /**
+   * Record job application
+   */
+  async recordJobApplication(jobId, companyId, jobTitle, companyName) {
+    try {
+      const application = {
+        jobId,
+        companyId,
+        jobTitle,
+        companyName,
+        appliedAt: new Date().toISOString(),
+        status: 'applied' // applied, interviewed, hired, rejected, withdrawn
+      };
+
+      const updateData = {
+        applicationHistory: [...this.applicationHistory, application],
+        totalJobsAppliedTo: this.totalJobsAppliedTo + 1,
+        lastActiveDate: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error recording job application:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record interview
+   */
+  async recordInterview(jobId, companyId, interviewDate, interviewType = 'in-person', status = 'scheduled') {
+    try {
+      const interview = {
+        jobId,
+        companyId,
+        interviewDate,
+        interviewType, // 'in-person', 'phone', 'video', 'group'
+        status, // 'scheduled', 'completed', 'no-show', 'cancelled'
+        recordedAt: new Date().toISOString()
+      };
+
+      const updateData = {
+        interviewHistory: [...this.interviewHistory, interview],
+        numberOfInterviews: this.numberOfInterviews + 1,
+        lastActiveDate: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error recording interview:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record no-show for interview
+   */
+  async recordNoShow(jobId, companyId, reason = 'No reason provided') {
+    try {
+      const updateData = {
+        numberOfNoShows: this.numberOfNoShows + 1,
+        lastActiveDate: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Also add a strike for no-show (this will handle suspension logic)
+      await this.addStrike(`No-show for interview - ${reason}`);
+      
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error recording no-show:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record hire/job completion
+   */
+  async recordHire(jobId, companyId, jobTitle, companyName, startDate, endDate = null, rating = null) {
+    try {
+      const hire = {
+        jobId,
+        companyId,
+        jobTitle,
+        companyName,
+        startDate,
+        endDate,
+        rating, // Company rating for this seeker (1-5)
+        recordedAt: new Date().toISOString()
+      };
+
+      const updateData = {
+        hireHistory: [...this.hireHistory, hire],
+        numberOfHires: this.numberOfHires + 1,
+        lastActiveDate: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // If company provided rating, update ratings
+      if (rating) {
+        const newRatings = [...this.companyRatings, { companyId, rating, jobId, ratedAt: new Date().toISOString() }];
+        const averageRating = newRatings.reduce((sum, r) => sum + r.rating, 0) / newRatings.length;
+        
+        updateData.companyRatings = newRatings;
+        updateData.averageRating = Math.round(averageRating * 10) / 10; // Round to 1 decimal
+      }
+
+      return await this.update(updateData);
+    } catch (error) {
+      console.error('Error recording hire:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get seeker statistics for CSV export
+   */
+  getSeekerStats() {
+    return {
+      seekerId: this.id,
+      fullName: this.fullName,
+      phoneNumber: this.mobileNumber,
+      email: this.email,
+      dateOfBirth: this.dateOfBirth,
+      gender: this.gender,
+      roles: this.roles,
+      status: this.getStatus(),
+      registrationDate: this.registrationDate,
+      lastActiveDate: this.lastActiveDate,
+      totalJobsAppliedTo: this.totalJobsAppliedTo,
+      numberOfHires: this.numberOfHires,
+      numberOfInterviews: this.numberOfInterviews,
+      numberOfNoShows: this.numberOfNoShows,
+      strikeCount: this.strikeCount,
+      currentStatus: this.isActive ? (this.isSuspended ? 'Suspended' : 'Activated') : 'Deactivated'
+    };
   }
 
   /**
@@ -749,7 +912,25 @@ class Seeker {
       strikeCount: this.strikeCount,
       suspendedUntil: this.suspendedUntil,
       isSuspended: this.isSuspended,
-      isPermanentlyBanned: this.isPermanentlyBanned
+      isPermanentlyBanned: this.isPermanentlyBanned,
+      
+      // Activity & Statistics Fields
+      totalJobsAppliedTo: this.totalJobsAppliedTo,
+      numberOfHires: this.numberOfHires,
+      numberOfInterviews: this.numberOfInterviews,
+      numberOfNoShows: this.numberOfNoShows,
+      registrationDate: this.registrationDate,
+      lastActiveDate: this.lastActiveDate,
+      
+      // Company Relations & Applications
+      applicationHistory: this.applicationHistory,
+      interviewHistory: this.interviewHistory,
+      hireHistory: this.hireHistory,
+      companyRatings: this.companyRatings,
+      averageRating: this.averageRating,
+      
+      // CV File
+      cvFile: this.cvFile
     };
   }
 

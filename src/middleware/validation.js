@@ -83,7 +83,7 @@ const commonValidations = {
     .isLength({ min: 1, max: 100 })
     .withMessage('Company name must be between 1 and 100 characters'),
 
-  commercialRegistrationNumber: () => body('commercialRegistrationNumber')
+  commercialRegistrationNumber: () => body('crNumber')
     .isLength({ min: 1, max: 20 })
     .withMessage('Commercial registration number must be between 1 and 20 characters')
     .isAlphanumeric()

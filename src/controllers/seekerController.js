@@ -969,6 +969,233 @@ class SeekerController {
       });
     }
   }
+
+  /**
+   * Record job application
+   * POST /api/seekers/:seekerId/apply-job
+   */
+  static async recordJobApplication(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { jobId, companyId, jobTitle, companyName } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.recordJobApplication(jobId, companyId, jobTitle, companyName);
+
+      res.status(200).json({
+        success: true,
+        message: 'Job application recorded successfully',
+        data: {
+          seekerId: seeker.id,
+          totalJobsAppliedTo: seeker.totalJobsAppliedTo,
+          lastActiveDate: seeker.lastActiveDate
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in recordJobApplication:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Record interview
+   * POST /api/seekers/:seekerId/record-interview
+   */
+  static async recordInterview(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { jobId, companyId, interviewDate, interviewType, status } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.recordInterview(jobId, companyId, interviewDate, interviewType, status);
+
+      res.status(200).json({
+        success: true,
+        message: 'Interview recorded successfully',
+        data: {
+          seekerId: seeker.id,
+          numberOfInterviews: seeker.numberOfInterviews,
+          lastActiveDate: seeker.lastActiveDate
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in recordInterview:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Record no-show
+   * POST /api/seekers/:seekerId/record-no-show
+   */
+  static async recordNoShow(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { jobId, companyId, reason } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.recordNoShow(jobId, companyId, reason);
+
+      res.status(200).json({
+        success: true,
+        message: 'No-show recorded successfully',
+        data: {
+          seekerId: seeker.id,
+          numberOfNoShows: seeker.numberOfNoShows,
+          strikeCount: seeker.strikeCount,
+          status: seeker.getStatus()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in recordNoShow:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Record hire/job completion
+   * POST /api/seekers/:seekerId/record-hire
+   */
+  static async recordHire(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { jobId, companyId, jobTitle, companyName, startDate, endDate, rating } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      await seeker.recordHire(jobId, companyId, jobTitle, companyName, startDate, endDate, rating);
+
+      res.status(200).json({
+        success: true,
+        message: 'Hire recorded successfully',
+        data: {
+          seekerId: seeker.id,
+          numberOfHires: seeker.numberOfHires,
+          averageRating: seeker.averageRating,
+          lastActiveDate: seeker.lastActiveDate
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in recordHire:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get seeker statistics (for CSV export)
+   * GET /api/seekers/:seekerId/stats
+   */
+  static async getSeekerStats(req, res) {
+    try {
+      const { seekerId } = req.params;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      const stats = seeker.getSeekerStats();
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker statistics retrieved successfully',
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error in getSeekerStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Export all seekers data (Admin only)
+   * GET /api/seekers/admin/export-csv
+   */
+  static async exportSeekerData(req, res) {
+    try {
+      const { limit = 1000 } = req.query;
+
+      // Get all active seekers
+      const seekers = await Seeker.search({ 
+        limit: parseInt(limit)
+      });
+
+      const csvData = seekers.map(seeker => seeker.getSeekerStats());
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker data exported successfully',
+        data: {
+          seekers: csvData,
+          count: csvData.length,
+          exportedAt: new Date().toISOString()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in exportSeekerData:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = SeekerController;

@@ -548,4 +548,135 @@ router.get('/admin/video-recorded', [
  */
 router.get('/admin/video-stats', [], SeekerController.getVideoWorkflowStats);
 
+/**
+ * @route   POST /api/seekers/:seekerId/apply-job
+ * @desc    Record job application
+ * @access  Public
+ */
+router.post('/:seekerId/apply-job', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('jobTitle')
+    .notEmpty()
+    .withMessage('Job title is required'),
+  body('companyName')
+    .notEmpty()
+    .withMessage('Company name is required')
+], SeekerController.recordJobApplication);
+
+/**
+ * @route   POST /api/seekers/:seekerId/record-interview
+ * @desc    Record interview
+ * @access  Public
+ */
+router.post('/:seekerId/record-interview', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('interviewDate')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('Interview date must be a valid ISO date'),
+  body('interviewType')
+    .optional()
+    .isIn(['in-person', 'phone', 'video', 'group'])
+    .withMessage('Interview type must be one of: in-person, phone, video, group'),
+  body('status')
+    .optional()
+    .isIn(['scheduled', 'completed', 'no-show', 'cancelled'])
+    .withMessage('Status must be one of: scheduled, completed, no-show, cancelled')
+], SeekerController.recordInterview);
+
+/**
+ * @route   POST /api/seekers/:seekerId/record-no-show
+ * @desc    Record no-show
+ * @access  Public
+ */
+router.post('/:seekerId/record-no-show', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('reason')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Reason must be less than 200 characters')
+], SeekerController.recordNoShow);
+
+/**
+ * @route   POST /api/seekers/:seekerId/record-hire
+ * @desc    Record hire/job completion
+ * @access  Public
+ */
+router.post('/:seekerId/record-hire', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('jobTitle')
+    .notEmpty()
+    .withMessage('Job title is required'),
+  body('companyName')
+    .notEmpty()
+    .withMessage('Company name is required'),
+  body('startDate')
+    .notEmpty()
+    .isISO8601()
+    .withMessage('Start date must be a valid ISO date'),
+  body('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('End date must be a valid ISO date'),
+  body('rating')
+    .optional()
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be between 1 and 5')
+], SeekerController.recordHire);
+
+/**
+ * @route   GET /api/seekers/:seekerId/stats
+ * @desc    Get seeker statistics (for CSV export)
+ * @access  Public
+ */
+router.get('/:seekerId/stats', [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.getSeekerStats);
+
+/**
+ * @route   GET /api/seekers/admin/export-csv
+ * @desc    Export all seekers data (Admin only)
+ * @access  Public
+ */
+router.get('/admin/export-csv', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 5000 })
+    .withMessage('Limit must be between 1 and 5000')
+], SeekerController.exportSeekerData);
+
 module.exports = router;

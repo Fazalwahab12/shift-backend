@@ -25,7 +25,7 @@ router.post('/', [
     .optional()
     .isLength({ min: 1, max: 100 })
     .withMessage('Arabic company name must be between 1 and 100 characters'),
-  body('commercialRegistrationNumber')
+  body('crNumber')
     .optional()
     .isLength({ min: 1, max: 20 })
     .withMessage('Commercial registration number must be between 1 and 20 characters'),
@@ -90,7 +90,7 @@ router.put('/:companyId', [
     .optional()
     .isLength({ min: 1, max: 100 })
     .withMessage('Arabic company name must be between 1 and 100 characters'),
-  body('commercialRegistrationNumber')
+  body('crNumber')
     .optional()
     .isLength({ min: 1, max: 20 })
     .withMessage('Commercial registration number must be between 1 and 20 characters'),
@@ -440,14 +440,71 @@ router.get('/:companyId/subscription', [
 ], CompanyController.getSubscriptionDetails);
 
 /**
+ * @route   POST /api/companies/:companyId/payment-transaction
+ * @desc    Add payment transaction
+ * @access  Public
+ */
+router.post('/:companyId/payment-transaction', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('paymentType')
+    .isIn(['PAYG', 'Add on', 'Starter Plan', 'Pro Bundle', 'Custom Plan'])
+    .withMessage('Payment type must be PAYG, Add on, Starter Plan, Pro Bundle, or Custom Plan'),
+  body('amount')
+    .isFloat({ min: 0 })
+    .withMessage('Amount must be a positive number'),
+  body('paymentDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Payment date must be a valid ISO date'),
+  body('validity')
+    .optional()
+    .isString()
+    .withMessage('Validity must be a string'),
+  body('lpoNumber')
+    .optional()
+    .isString()
+    .withMessage('LPO number must be a string'),
+  body('lpoIssuedDate')
+    .optional()
+    .isISO8601()
+    .withMessage('LPO issued date must be a valid ISO date'),
+  body('paymentStatus')
+    .optional()
+    .isIn(['pending', 'completed', 'failed', 'refunded'])
+    .withMessage('Payment status must be pending, completed, failed, or refunded'),
+  body('transactionReference')
+    .optional()
+    .isString()
+    .withMessage('Transaction reference must be a string')
+], CompanyController.addPaymentTransaction);
+
+/**
  * @route   GET /api/companies/:companyId/payment-history
- * @desc    Get payment history
+ * @desc    Get payment history with filtering
  * @access  Public
  */
 router.get('/:companyId/payment-history', [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
+  query('paymentType')
+    .optional()
+    .isIn(['PAYG', 'Add on', 'Starter Plan', 'Pro Bundle', 'Custom Plan'])
+    .withMessage('Payment type must be PAYG, Add on, Starter Plan, Pro Bundle, or Custom Plan'),
+  query('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Start date must be a valid ISO date'),
+  query('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('End date must be a valid ISO date'),
+  query('status')
+    .optional()
+    .isIn(['pending', 'completed', 'failed', 'refunded'])
+    .withMessage('Status must be pending, completed, failed, or refunded'),
   query('limit')
     .optional()
     .isInt({ min: 1, max: 100 })
@@ -457,6 +514,64 @@ router.get('/:companyId/payment-history', [
     .isInt({ min: 0 })
     .withMessage('Offset must be 0 or greater')
 ], CompanyController.getPaymentHistory);
+
+/**
+ * @route   GET /api/companies/:companyId/payment-stats
+ * @desc    Get payment statistics
+ * @access  Public
+ */
+router.get('/:companyId/payment-stats', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getPaymentStats);
+
+/**
+ * @route   GET /api/companies/:companyId/pricing-plans
+ * @desc    Get current pricing plans
+ * @access  Public
+ */
+router.get('/:companyId/pricing-plans', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getPricingPlans);
+
+/**
+ * @route   GET /api/companies/:companyId/recommended-plan
+ * @desc    Get recommended plan based on usage
+ * @access  Public
+ */
+router.get('/:companyId/recommended-plan', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getRecommendedPlan);
+
+/**
+ * @route   GET /api/companies/:companyId/can-perform/:action
+ * @desc    Check if company can perform action
+ * @access  Public
+ */
+router.get('/:companyId/can-perform/:action', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('action')
+    .isIn(['instant_match', 'interview', 'add_location', 'add_team_member', 'job_posting'])
+    .withMessage('Action must be instant_match, interview, add_location, add_team_member, or job_posting')
+], CompanyController.canPerformAction);
+
+/**
+ * @route   GET /api/companies/:companyId/trial-status
+ * @desc    Get trial status
+ * @access  Public
+ */
+router.get('/:companyId/trial-status', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getTrialStatus);
 
 /**
  * @route   POST /api/companies/:companyId/admin/verify-cr
@@ -494,5 +609,118 @@ router.delete('/:companyId', [
     .notEmpty()
     .withMessage('Company ID is required')
 ], CompanyController.deleteProfile);
+
+/**
+ * @route   GET /api/companies/:companyId/csv-data
+ * @desc    Get company data in CSV format
+ * @access  Public
+ */
+router.get('/:companyId/csv-data', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getCompanyCSVData);
+
+/**
+ * @route   PUT /api/companies/:companyId/csv-update
+ * @desc    Update company data from CSV
+ * @access  Public
+ */
+router.put('/:companyId/csv-update', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('companyNumber')
+    .optional()
+    .isString()
+    .withMessage('Company number must be a string'),
+  body('companyName')
+    .optional()
+    .isString()
+    .withMessage('Company name must be a string'),
+  body('companyCR')
+    .optional()
+    .isString()
+    .withMessage('Company CR must be a string'),
+  body('industry')
+    .optional()
+    .isString()
+    .withMessage('Industry must be a string'),
+  body('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a string'),
+  body('registrationDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Registration date must be a valid ISO date'),
+  body('numberOfBands')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Number of bands must be a positive integer'),
+  body('numberOfBranches')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Number of branches must be a positive integer'),
+  body('lastActiveDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Last active date must be a valid ISO date'),
+  body('numberOfJobPosts')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Number of job posts must be 0 or greater'),
+  body('totalInstantHires')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Total instant hires must be 0 or greater'),
+  body('totalInterviews')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Total interviews must be 0 or greater'),
+  body('spentOnHiring')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Spent on hiring must be 0 or greater'),
+  body('usedFreeTrial')
+    .optional()
+    .isBoolean()
+    .withMessage('Used free trial must be a boolean'),
+  body('previousPlansPurchases')
+    .optional()
+    .isString()
+    .withMessage('Previous plans purchases must be a string')
+], CompanyController.updateCompanyFromCSV);
+
+/**
+ * @route   GET /api/companies/:companyId/stats
+ * @desc    Get company statistics for reporting
+ * @access  Public
+ */
+router.get('/:companyId/stats', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getCompanyStats);
+
+/**
+ * @route   GET /api/companies/export/csv
+ * @desc    Export all companies data to CSV format
+ * @access  Public
+ */
+router.get('/export/csv', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 10000 })
+    .withMessage('Limit must be between 1 and 10000'),
+  query('industry')
+    .optional()
+    .isString()
+    .withMessage('Industry must be a string'),
+  query('usedFreeTrial')
+    .optional()
+    .isIn(['true', 'false'])
+    .withMessage('Used free trial must be true or false')
+], CompanyController.exportCompaniesToCSV);
 
 module.exports = router;

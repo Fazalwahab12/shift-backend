@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const OnboardingController = require('../controllers/onboardingController');
+const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -10,13 +11,11 @@ const router = express.Router();
 
 /**
  * @route   POST /api/onboarding
- * @desc    Create or update onboarding data
- * @access  Public
+ * @desc    Create or update onboarding data (token-based)
+ * @access  Private
  */
 router.post('/', [
-  body('userId')
-    .notEmpty()
-    .withMessage('User ID is required'),
+  authenticateToken,
   body('userType')
     .isIn(['seeker', 'company'])
     .withMessage('User type must be either seeker or company'),

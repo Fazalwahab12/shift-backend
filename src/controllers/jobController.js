@@ -34,15 +34,15 @@ class JobController {
       }
 
       // Check if company can create jobs (subscription limits)
-      if (!company.canPerformAction('create_job')) {
+      if (!company.canPerformAction('job_posting')) {
         return res.status(403).json({
           success: false,
-          message: 'Job creation limit reached for current plan',
-          data: {
-            currentJobs: await Job.findByCompanyId(companyId).length,
-            maxJobs: company.planLimits.jobPostings,
-            subscriptionPlan: company.subscriptionPlan
-          }
+          message: 'Job posting limit reached for current plan',
+                      data: {
+              currentJobs: (await Job.findByCompanyId(companyId)).length,
+              maxJobs: company.planLimits.jobPostings,
+              subscriptionPlan: company.subscriptionPlan
+            }
         });
       }
 
