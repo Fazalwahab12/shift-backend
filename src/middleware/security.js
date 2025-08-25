@@ -96,10 +96,15 @@ const helmetConfig = helmet({
  */
 const corsOptions = {
   origin: function (origin, callback) {
+    // In development, allow all origins for mobile app testing
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Define allowed origins
+    // Define allowed origins for production
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:8081',

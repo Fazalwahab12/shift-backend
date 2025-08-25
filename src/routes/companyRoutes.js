@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query } = require('express-validator');
 const CompanyController = require('../controllers/companyController');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -11,12 +12,9 @@ const router = express.Router();
 /**
  * @route   POST /api/companies
  * @desc    Create company profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/', [
-  body('userId')
-    .notEmpty()
-    .withMessage('User ID is required'),
+router.post('/', authenticateToken, [
   body('companyName')
     .optional()
     .isLength({ min: 1, max: 100 })
@@ -54,9 +52,9 @@ router.post('/', [
 /**
  * @route   GET /api/companies/user/:userId
  * @desc    Get company profile by user ID
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/user/:userId', [
+router.get('/user/:userId', authenticateToken, [
   param('userId')
     .notEmpty()
     .withMessage('User ID is required')
@@ -65,9 +63,9 @@ router.get('/user/:userId', [
 /**
  * @route   GET /api/companies/:companyId
  * @desc    Get company profile by ID
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId', [
+router.get('/:companyId', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -76,9 +74,9 @@ router.get('/:companyId', [
 /**
  * @route   PUT /api/companies/:companyId
  * @desc    Update company profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:companyId', [
+router.put('/:companyId', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -111,9 +109,9 @@ router.put('/:companyId', [
 /**
  * @route   PUT /api/companies/:companyId/step/:step
  * @desc    Update profile step
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:companyId/step/:step', [
+router.put('/:companyId/step/:step', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -168,9 +166,9 @@ router.get('/industry/:industry', [
 /**
  * @route   GET /api/companies/:companyId/completion
  * @desc    Get profile completion status
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/completion', [
+router.get('/:companyId/completion', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -179,9 +177,9 @@ router.get('/:companyId/completion', [
 /**
  * @route   POST /api/companies/:companyId/logo
  * @desc    Upload company logo
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/logo', [
+router.post('/:companyId/logo', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -195,9 +193,9 @@ router.post('/:companyId/logo', [
 /**
  * @route   POST /api/companies/:companyId/cover
  * @desc    Upload cover photo
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/cover', [
+router.post('/:companyId/cover', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -224,9 +222,9 @@ router.get('/check-registration/:crNumber', [
 /**
  * @route   POST /api/companies/:companyId/rating
  * @desc    Update company rating
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/rating', [
+router.post('/:companyId/rating', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -238,9 +236,9 @@ router.post('/:companyId/rating', [
 /**
  * @route   PUT /api/companies/:companyId/trial-status
  * @desc    Update trial status
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:companyId/trial-status', [
+router.put('/:companyId/trial-status', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -249,9 +247,9 @@ router.put('/:companyId/trial-status', [
 /**
  * @route   POST /api/companies/:companyId/payment-methods
  * @desc    Add payment method
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/payment-methods', [
+router.post('/:companyId/payment-methods', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -271,9 +269,9 @@ router.post('/:companyId/payment-methods', [
 /**
  * @route   POST /api/companies/:companyId/purchase-subscription
  * @desc    Purchase subscription
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/purchase-subscription', [
+router.post('/:companyId/purchase-subscription', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -292,9 +290,9 @@ router.post('/:companyId/purchase-subscription', [
 /**
  * @route   POST /api/companies/:companyId/payg-payment
  * @desc    Process pay-as-you-go payment
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/payg-payment', [
+router.post('/:companyId/payg-payment', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -313,9 +311,9 @@ router.post('/:companyId/payg-payment', [
 /**
  * @route   POST /api/companies/:companyId/request-custom-plan
  * @desc    Request custom plan
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/request-custom-plan', [
+router.post('/:companyId/request-custom-plan', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -340,9 +338,9 @@ router.post('/:companyId/request-custom-plan', [
 /**
  * @route   POST /api/companies/:companyId/contact-admin
  * @desc    Contact admin
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/contact-admin', [
+router.post('/:companyId/contact-admin', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -355,9 +353,9 @@ router.post('/:companyId/contact-admin', [
 /**
  * @route   POST /api/companies/:companyId/team-members
  * @desc    Add team member
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/team-members', [
+router.post('/:companyId/team-members', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -369,9 +367,9 @@ router.post('/:companyId/team-members', [
 /**
  * @route   POST /api/companies/:companyId/brands
  * @desc    Add brand
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/brands', [
+router.post('/:companyId/brands', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -396,9 +394,9 @@ router.post('/:companyId/brands', [
 /**
  * @route   POST /api/companies/:companyId/locations
  * @desc    Add location
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/locations', [
+router.post('/:companyId/locations', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -431,9 +429,9 @@ router.post('/:companyId/locations', [
 /**
  * @route   GET /api/companies/:companyId/subscription
  * @desc    Get subscription details
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/subscription', [
+router.get('/:companyId/subscription', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -442,9 +440,9 @@ router.get('/:companyId/subscription', [
 /**
  * @route   POST /api/companies/:companyId/payment-transaction
  * @desc    Add payment transaction
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:companyId/payment-transaction', [
+router.post('/:companyId/payment-transaction', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -483,9 +481,9 @@ router.post('/:companyId/payment-transaction', [
 /**
  * @route   GET /api/companies/:companyId/payment-history
  * @desc    Get payment history with filtering
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/payment-history', [
+router.get('/:companyId/payment-history', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -518,9 +516,9 @@ router.get('/:companyId/payment-history', [
 /**
  * @route   GET /api/companies/:companyId/payment-stats
  * @desc    Get payment statistics
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/payment-stats', [
+router.get('/:companyId/payment-stats', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -529,9 +527,9 @@ router.get('/:companyId/payment-stats', [
 /**
  * @route   GET /api/companies/:companyId/pricing-plans
  * @desc    Get current pricing plans
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/pricing-plans', [
+router.get('/:companyId/pricing-plans', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -540,9 +538,9 @@ router.get('/:companyId/pricing-plans', [
 /**
  * @route   GET /api/companies/:companyId/recommended-plan
  * @desc    Get recommended plan based on usage
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/recommended-plan', [
+router.get('/:companyId/recommended-plan', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -551,9 +549,9 @@ router.get('/:companyId/recommended-plan', [
 /**
  * @route   GET /api/companies/:companyId/can-perform/:action
  * @desc    Check if company can perform action
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/can-perform/:action', [
+router.get('/:companyId/can-perform/:action', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -565,9 +563,9 @@ router.get('/:companyId/can-perform/:action', [
 /**
  * @route   GET /api/companies/:companyId/trial-status
  * @desc    Get trial status
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/trial-status', [
+router.get('/:companyId/trial-status', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -576,9 +574,9 @@ router.get('/:companyId/trial-status', [
 /**
  * @route   POST /api/companies/:companyId/admin/verify-cr
  * @desc    Admin: Verify CR
- * @access  Admin
+ * @access  Private (JWT Token Required - Admin)
  */
-router.post('/:companyId/admin/verify-cr', [
+router.post('/:companyId/admin/verify-cr', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -591,9 +589,9 @@ router.post('/:companyId/admin/verify-cr', [
 /**
  * @route   GET /api/companies/:companyId/detailed
  * @desc    Get detailed company profile (admin)
- * @access  Admin
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/:companyId/detailed', [
+router.get('/:companyId/detailed', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -602,9 +600,9 @@ router.get('/:companyId/detailed', [
 /**
  * @route   DELETE /api/companies/:companyId
  * @desc    Delete company profile
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.delete('/:companyId', [
+router.delete('/:companyId', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -613,9 +611,9 @@ router.delete('/:companyId', [
 /**
  * @route   GET /api/companies/:companyId/csv-data
  * @desc    Get company data in CSV format
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/csv-data', [
+router.get('/:companyId/csv-data', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -624,9 +622,9 @@ router.get('/:companyId/csv-data', [
 /**
  * @route   PUT /api/companies/:companyId/csv-update
  * @desc    Update company data from CSV
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:companyId/csv-update', [
+router.put('/:companyId/csv-update', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -695,9 +693,9 @@ router.put('/:companyId/csv-update', [
 /**
  * @route   GET /api/companies/:companyId/stats
  * @desc    Get company statistics for reporting
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.get('/:companyId/stats', [
+router.get('/:companyId/stats', authenticateToken, [
   param('companyId')
     .notEmpty()
     .withMessage('Company ID is required')
@@ -706,9 +704,9 @@ router.get('/:companyId/stats', [
 /**
  * @route   GET /api/companies/export/csv
  * @desc    Export all companies data to CSV format
- * @access  Public
+ * @access  Private (JWT Token Required - Admin)
  */
-router.get('/export/csv', [
+router.get('/export/csv', authenticateToken, [
   query('limit')
     .optional()
     .isInt({ min: 1, max: 10000 })
