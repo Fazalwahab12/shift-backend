@@ -37,17 +37,7 @@ router.post('/register', [
  * @desc    Check if phone number exists
  * @access  Public
  */
-router.get('/check/:phoneNumber', [
-  param('phoneNumber')
-    .isLength({ min: 8, max: 15 })
-    .withMessage('Phone number must be between 8 and 15 digits')
-    .isNumeric()
-    .withMessage('Phone number must contain only numbers'),
-  query('countryCode')
-    .optional()
-    .matches(/^\+\d+$/)
-    .withMessage('Country code must start with + followed by numbers')
-], PhoneController.checkPhone);
+router.get('/check/:phoneNumber', PhoneController.checkPhone);
 
 
 

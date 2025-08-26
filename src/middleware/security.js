@@ -97,7 +97,7 @@ const helmetConfig = helmet({
 const corsOptions = {
   origin: function (origin, callback) {
     // In development, allow all origins for mobile app testing
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
       return callback(null, true);
     }
     
@@ -108,8 +108,11 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:8081',
+      'http://192.168.42.165:3000',
+      'http://192.168.42.165:8081',
       'https://your-frontend-domain.com',
       'exp://192.168.1.100:8081', // Expo development
+      'exp://192.168.42.165:8081', // Your actual IP
     ];
     
     // Add environment-specific origins
@@ -120,6 +123,7 @@ const corsOptions = {
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },

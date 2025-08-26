@@ -29,6 +29,7 @@ const seekerRoutes = require('./routes/seekerRoutes');
 const companyRoutes = require('./routes/companyRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const userJourneyRoutes = require('./routes/userJourneyRoutes');
+const callbackRoutes = require('./routes/callback');
 
 /**
  * Shift Backend API Server
@@ -91,9 +92,11 @@ class ShiftServer {
     // Trust proxy for accurate IP addresses
     this.app.set('trust proxy', 1);
 
-    // Security middleware
-    this.app.use(helmetConfig);
-    this.app.use(securityHeaders);
+    // Security middleware (disabled for development)
+    if (this.environment !== 'development') {
+      this.app.use(helmetConfig);
+      this.app.use(securityHeaders);
+    }
     
     // CORS
     this.app.use(cors(corsOptions));
@@ -101,8 +104,10 @@ class ShiftServer {
     // Compression
     this.app.use(compression());
     
-    // Rate limiting
-    this.app.use('/api/', generalLimiter);
+    // Rate limiting (disabled for development)
+    if (this.environment !== 'development') {
+      this.app.use('/api/', generalLimiter);
+    }
     
     // Request logging
     if (this.environment === 'development') {
@@ -116,9 +121,11 @@ class ShiftServer {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     
-    // Request validation and sanitization
-    this.app.use(validateRequest);
-    this.app.use(sanitizeRequest);
+    // Request validation and sanitization (disabled for development)
+    if (this.environment !== 'development') {
+      this.app.use(validateRequest);
+      this.app.use(sanitizeRequest);
+    }
 
     console.log('✅ Middleware configured successfully');
   }
@@ -147,6 +154,7 @@ class ShiftServer {
     this.app.use('/api/companies', companyRoutes);
     this.app.use('/api/jobs', jobRoutes);
     this.app.use('/api/journey', userJourneyRoutes);
+    this.app.use('/api/callback', callbackRoutes);
 
     // API documentation endpoint
     this.app.get('/api', (req, res) => {
@@ -160,7 +168,8 @@ class ShiftServer {
           seekers: '/api/seekers',
           companies: '/api/companies',
           jobs: '/api/jobs',
-          journey: '/api/journey'
+          journey: '/api/journey',
+          callback: '/api/callback'
         },
         timestamp: new Date().toISOString()
       });
@@ -188,7 +197,7 @@ class ShiftServer {
    * Start the server
    */
   startServer() {
-    const server = this.app.listen(this.port, () => {
+    const server = this.app.listen(this.port, '0.0.0.0', () => {
       console.log('🎉 Server started successfully!');
       console.log(`📍 Environment: ${this.environment}`);
       console.log(`🌐 Server running on port ${this.port}`);
