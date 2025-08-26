@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "setup": "node scripts/setup.js",
+    "railway:credentials": "node scripts/get-firebase-credentials.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/",

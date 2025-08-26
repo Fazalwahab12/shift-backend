@@ -40,6 +40,7 @@ class ShiftServer {
     this.app = express();
     this.port = process.env.PORT || 3000;
     this.environment = process.env.NODE_ENV || 'development';
+    this.databaseEnabled = false;
   }
 
   /**
@@ -48,8 +49,10 @@ class ShiftServer {
   async initialize() {
     try {
       console.log('🚀 Initializing Shift Backend Server...');
+      console.log(`📍 Environment: ${this.environment}`);
+      console.log(`🌐 Port: ${this.port}`);
       
-      // Initialize database
+      // Initialize database (with fallback)
       await this.initializeDatabase();
       
       // Configure middleware
@@ -66,20 +69,36 @@ class ShiftServer {
       
     } catch (error) {
       console.error('❌ Failed to initialize server:', error);
-      process.exit(1);
+      // Don't exit immediately, try to start without database
+      console.log('⚠️  Attempting to start server without database...');
+      this.startServerWithoutDatabase();
     }
   }
 
   /**
-   * Initialize database connection
+   * Initialize database connection with fallback
    */
   async initializeDatabase() {
     try {
+      // Check if Firebase credentials are available
+      const hasFirebaseCredentials = process.env.FIREBASE_SERVICE_ACCOUNT || 
+                                   process.env.FIREBASE_PROJECT_ID ||
+                                   process.env.FIREBASE_DATABASE_URL;
+      
+      if (!hasFirebaseCredentials) {
+        console.log('⚠️  No Firebase credentials found. Database features will be disabled.');
+        this.databaseEnabled = false;
+        return;
+      }
+
       await databaseService.initialize();
+      this.databaseEnabled = true;
       console.log('✅ Database initialized successfully');
     } catch (error) {
       console.error('❌ Database initialization failed:', error);
-      throw error;
+      console.log('⚠️  Continuing without database...');
+      this.databaseEnabled = false;
+      // Don't throw error, allow server to start without database
     }
   }
 
@@ -89,7 +108,7 @@ class ShiftServer {
   configureMiddleware() {
     console.log('⚙️  Configuring middleware...');
 
-    // Trust proxy for accurate IP addresses
+    // Trust proxy for accurate IP addresses (important for Railway)
     this.app.set('trust proxy', 1);
 
     // Security middleware (disabled for development)
@@ -98,8 +117,14 @@ class ShiftServer {
       this.app.use(securityHeaders);
     }
     
-    // CORS
-    this.app.use(cors(corsOptions));
+    // CORS - Railway specific
+    const railwayCorsOptions = {
+      ...corsOptions,
+      origin: process.env.ALLOWED_ORIGINS ? 
+        process.env.ALLOWED_ORIGINS.split(',') : 
+        ['http://localhost:3000', 'https://localhost:3000']
+    };
+    this.app.use(cors(railwayCorsOptions));
     
     // Compression
     this.app.use(compression());
@@ -143,17 +168,62 @@ class ShiftServer {
         message: 'Shift Backend API is running',
         timestamp: new Date().toISOString(),
         environment: this.environment,
-        version: '1.0.0'
+        version: '1.0.0',
+        database: this.databaseEnabled ? 'connected' : 'disabled'
       });
     });
 
-    // API routes
-    this.app.use('/api/phone', phoneRoutes);
-    this.app.use('/api/onboarding', onboardingRoutes);
-    this.app.use('/api/seekers', seekerRoutes);
-    this.app.use('/api/companies', companyRoutes);
-    this.app.use('/api/jobs', jobRoutes);
-    this.app.use('/api/journey', userJourneyRoutes);
+    // API routes (only if database is enabled)
+    if (this.databaseEnabled) {
+      this.app.use('/api/phone', phoneRoutes);
+      this.app.use('/api/onboarding', onboardingRoutes);
+      this.app.use('/api/seekers', seekerRoutes);
+      this.app.use('/api/companies', companyRoutes);
+      this.app.use('/api/jobs', jobRoutes);
+      this.app.use('/api/journey', userJourneyRoutes);
+      console.log('✅ Database routes enabled');
+    } else {
+      // Mock routes for when database is disabled
+      this.app.use('/api/phone', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      this.app.use('/api/onboarding', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      this.app.use('/api/seekers', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      this.app.use('/api/companies', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      this.app.use('/api/jobs', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      this.app.use('/api/journey', (req, res) => {
+        res.status(503).json({ 
+          success: false, 
+          message: 'Database not available. Please check Firebase configuration.' 
+        });
+      });
+      console.log('⚠️  Database routes disabled - using mock responses');
+    }
+
+    // Callback routes (always available)
     this.app.use('/api/callback', callbackRoutes);
 
     // API documentation endpoint
@@ -162,7 +232,10 @@ class ShiftServer {
         success: true,
         message: 'Shift Backend API v1.0.0',
         documentation: '/api/docs',
+        environment: this.environment,
+        database: this.databaseEnabled ? 'connected' : 'disabled',
         endpoints: {
+          health: '/health',
           phone: '/api/phone',
           onboarding: '/api/onboarding',
           seekers: '/api/seekers',
@@ -203,6 +276,7 @@ class ShiftServer {
       console.log(`🌐 Server running on port ${this.port}`);
       console.log(`🔗 Health check: http://localhost:${this.port}/health`);
       console.log(`📚 API docs: http://localhost:${this.port}/api`);
+      console.log(`💾 Database: ${this.databaseEnabled ? 'Connected' : 'Disabled'}`);
       console.log('────────────────────────────────────────');
     });
 
@@ -224,6 +298,16 @@ class ShiftServer {
     });
 
     return server;
+  }
+
+  /**
+   * Start server without database (fallback)
+   */
+  startServerWithoutDatabase() {
+    this.configureMiddleware();
+    this.configureRoutes();
+    this.configureErrorHandling();
+    this.startServer();
   }
 }
 
