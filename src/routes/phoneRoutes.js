@@ -39,7 +39,24 @@ router.post('/register', [
  */
 router.get('/check/:phoneNumber', PhoneController.checkPhone);
 
-
+/**
+ * @route   POST /api/phone/check-status
+ * @desc    Check user suspension status by phone number
+ * @access  Public
+ */
+router.post('/check-status', [
+  body('phoneNumber')
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Phone number must be between 8 and 15 digits')
+    .isNumeric()
+    .withMessage('Phone number must contain only numbers'),
+  body('countryCode')
+    .optional()
+    .isLength({ min: 2, max: 5 })
+    .withMessage('Country code must be between 2 and 5 characters')
+    .matches(/^\+\d+$/)
+    .withMessage('Country code must start with + followed by numbers')
+], PhoneController.checkStatus);
 
 /**
  * @route   POST /api/phone/send-otp
@@ -135,6 +152,15 @@ router.get('/stats', [
     .isIn(['seeker', 'company'])
     .withMessage('User type must be either seeker or company')
 ], PhoneController.getStats);
+
+/**
+ * @route   POST /api/phone/logout
+ * @desc    Logout user and update last activity
+ * @access  Private
+ */
+router.post('/logout', [
+  authenticateToken
+], PhoneController.logout);
 
 /**
  * @route   DELETE /api/phone/delete/:userId

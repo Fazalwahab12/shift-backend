@@ -40,14 +40,54 @@ class PhoneController {
       // Check if phone number already exists
       const existingUser = await User.findByPhone(phoneNumber, cleanCountryCode);
       if (existingUser) {
-        return res.status(409).json({
-          success: false,
-          message: 'Phone number already registered',
+        // Check suspension status for existing users
+        const isSuspended = existingUser.isSuspended();
+        
+        if (isSuspended) {
+          return res.status(403).json({
+            success: false,
+            message: existingUser.isPermanentlyBanned 
+              ? 'Account permanently banned' 
+              : 'Account suspended',
+            data: {
+              userId: existingUser.id,
+              isSuspended: true,
+              isPermanentlyBanned: existingUser.isPermanentlyBanned,
+              suspendedUntil: existingUser.suspendedUntil,
+              suspensionType: existingUser.isPermanentlyBanned ? 'permanent' : 'temporary'
+            }
+          });
+        }
+
+        // For existing users, send OTP to allow login
+        const otpResult = await sendOTP(phoneNumber, cleanCountryCode);
+
+        if (!otpResult.success) {
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to send OTP',
+            error: otpResult.error
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'OTP sent successfully for existing user',
           data: {
             userId: existingUser.id,
+            phoneNumber: existingUser.phoneNumber,
+            countryCode: existingUser.countryCode,
             userType: existingUser.userType,
+            isPhoneVerified: existingUser.isPhoneVerified,
             onboardingCompleted: existingUser.onboardingCompleted,
-            profileCompleted: existingUser.profileCompleted
+            profileCompleted: existingUser.profileCompleted,
+            isExistingUser: true,
+            nextStep: existingUser.isPhoneVerified 
+              ? (existingUser.onboardingCompleted 
+                  ? (existingUser.profileCompleted ? 'home' : 'profile') 
+                  : 'onboarding') 
+              : 'otp_verification',
+            otpSent: true
           }
         });
       }
@@ -279,6 +319,24 @@ class PhoneController {
         return res.status(404).json({
           success: false,
           message: 'User not found'
+        });
+      }
+
+      // Check suspension status before verification
+      const isSuspended = user.isSuspended();
+      if (isSuspended) {
+        return res.status(403).json({
+          success: false,
+          message: user.isPermanentlyBanned 
+            ? 'Account permanently banned' 
+            : 'Account suspended',
+          error: 'ACCOUNT_SUSPENDED',
+          data: {
+            isSuspended: true,
+            isPermanentlyBanned: user.isPermanentlyBanned,
+            suspendedUntil: user.suspendedUntil,
+            suspensionType: user.isPermanentlyBanned ? 'permanent' : 'temporary'
+          }
         });
       }
 
@@ -568,6 +626,106 @@ class PhoneController {
 
     } catch (error) {
       console.error('Error in deletePhone:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+  /**
+   * Check user suspension status by phone number
+   * POST /api/phone/check-status
+   */
+  static async checkStatus(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { phoneNumber, countryCode } = req.body;
+
+      // Handle country code formatting
+      let cleanCountryCode = (countryCode || '+968').trim();
+      if (cleanCountryCode.match(/^\s\d+$/)) {
+        cleanCountryCode = '+' + cleanCountryCode.trim();
+      }
+      if (cleanCountryCode && !cleanCountryCode.startsWith('+')) {
+        cleanCountryCode = '+' + cleanCountryCode;
+      }
+
+      // Find user by phone number
+      const user = await User.findByPhone(phoneNumber, cleanCountryCode);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Phone number not found',
+          data: {
+            isSuspended: false,
+            isPermanentlyBanned: false,
+            phoneExists: false
+          }
+        });
+      }
+
+      // Check suspension status
+      const isSuspended = user.isSuspended();
+
+      res.status(200).json({
+        success: true,
+        message: 'User status retrieved successfully',
+        data: {
+          userId: user.id,
+          phoneExists: true,
+          isSuspended: isSuspended,
+          isPermanentlyBanned: user.isPermanentlyBanned,
+          suspendedUntil: user.suspendedUntil,
+          suspensionType: user.isPermanentlyBanned ? 'permanent' : (user.suspendedUntil ? 'temporary' : 'none'),
+          userType: user.userType,
+          isActive: user.isActive
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in checkStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Logout user (clear tokens and update last activity)
+   * POST /api/phone/logout
+   */
+  static async logout(req, res) {
+    try {
+      const { userId } = req.user; // From auth middleware
+
+      // Update user's last activity
+      const user = await User.findById(userId);
+      if (user) {
+        await user.update({
+          lastLoginAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Logged out successfully'
+      });
+
+    } catch (error) {
+      console.error('Error in logout:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

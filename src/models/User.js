@@ -14,6 +14,8 @@ class User {
     this.onboardingCompleted = data.onboardingCompleted || false;
     this.profileCompleted = data.profileCompleted || false;
     this.isActive = data.isActive !== undefined ? data.isActive : true;
+    this.suspendedUntil = data.suspendedUntil || false;
+    this.isPermanentlyBanned = data.isPermanentlyBanned || false;
     this.createdAt = data.createdAt || null;
     this.updatedAt = data.updatedAt || null;
     this.lastLoginAt = data.lastLoginAt || null;
@@ -140,6 +142,45 @@ class User {
   }
 
   /**
+   * Suspend user account until specific date
+   */
+  async suspend() {
+    return await this.update({
+      suspendedUntil: true,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Permanently ban user account
+   */
+  async permanentBan() {
+    return await this.update({
+      isPermanentlyBanned: true,
+      isActive: false,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Remove suspension from user account
+   */
+  async removeSuspension() {
+    return await this.update({
+      suspendedUntil: false,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Check if user is currently suspended
+   */
+  isSuspended() {
+    if (this.isPermanentlyBanned) return true;
+    return this.suspendedUntil === true;
+  }
+
+  /**
    * Check if user exists by phone
    */
   static async phoneExists(phoneNumber, countryCode = '+968') {
@@ -225,6 +266,8 @@ class User {
       onboardingCompleted: this.onboardingCompleted,
       profileCompleted: this.profileCompleted,
       isActive: this.isActive,
+      suspendedUntil: this.suspendedUntil,
+      isPermanentlyBanned: this.isPermanentlyBanned,
       lastLoginAt: this.lastLoginAt
     };
   }

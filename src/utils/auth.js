@@ -1,6 +1,11 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+// OMANTEL OTP SERVICE - Comment out for testing
+// const omantelOTPService = require('../services/omantelOTPService');
+const logger = require('./logger');
 
+// Store authentication IDs temporarily (use Redis in production)
+const otpStore = new Map();
 /**
  * Authentication Utilities
  * Handles JWT token generation, verification, and refresh token management
@@ -154,58 +159,205 @@ const refreshAccessToken = (refreshToken, userData = {}) => {
   };
 };
 
-/**
- * Generate OTP (for development/testing)
- */
-const generateOTP = (length = 6) => {
-  return Math.floor(Math.random() * Math.pow(10, length))
-    .toString()
-    .padStart(length, '0');
-};
 
-/**
- * Verify OTP (mock implementation - replace with actual SMS provider integration)
- * For development: Accept any 4-6 digit OTP
- * TODO: Replace with strict SMS provider verification in production
- */
-const verifyOTP = async (phoneNumber, otp) => {
-  // For development: Accept any 4-6 digit OTP
-  // TODO: Replace with actual SMS provider verification in production
-  
-  if (!otp || otp.length < 4 || otp.length > 6 || !/^\d+$/.test(otp)) {
+
+// OMANTEL OTP VERIFICATION - Commented out for testing
+/*
+const verifyOTP = async (phoneNumber, otp, countryCode = '+968') => {
+  try {
+    const storeKey = `${countryCode}${phoneNumber}`;
+    const storedData = otpStore.get(storeKey);
+    
+    if (!storedData) {
+      logger.warn('OTP verification failed - no stored data', { phoneNumber: storeKey });
+      return {
+        valid: false,
+        error: 'No OTP request found or expired'
+      };
+    }
+    
+    // Check attempts limit
+    if (storedData.attempts >= 3) {
+      otpStore.delete(storeKey);
+      logger.warn('OTP verification failed - too many attempts', { phoneNumber: storeKey });
+      return {
+        valid: false,
+        error: 'Too many verification attempts'
+      };
+    }
+    
+    // Increment attempts
+    storedData.attempts += 1;
+    otpStore.set(storeKey, storedData);
+    
+    // Verify with Omantel
+    logger.info('Verifying OTP with Omantel', { 
+      phoneNumber: storeKey, 
+      attempt: storedData.attempts,
+      authenticationId: storedData.authenticationId
+    });
+    
+    const result = await omantelOTPService.verifyOTP(storedData.authenticationId, otp);
+    
+    // Clean up on success
+    if (result.valid) {
+      otpStore.delete(storeKey);
+      logger.info('OTP verified successfully', { phoneNumber: storeKey });
+    }
+    
+    return result;
+  } catch (error) {
+    logger.error('Verify OTP error', { error: error.message, phoneNumber: `${countryCode}${phoneNumber}` });
     return {
       valid: false,
-      error: 'Invalid OTP format - must be 4-6 digits'
+      error: error.message
     };
   }
-
-  // For development: Accept any valid format OTP
-  // In production, this will verify with Oman SMS provider
-  console.log(`🔧 DEV MODE: Accepting any OTP for ${phoneNumber}: ${otp}`);
-  
-  return {
-    valid: true,
-    message: 'OTP verified successfully (Dev Mode)'
-  };
 };
+*/
 
 /**
- * Send OTP via SMS (mock implementation)
+ * MOCK OTP VERIFICATION - For testing purposes
+ * Remove this and uncomment Omantel version above for production
+ */
+const verifyOTP = async (phoneNumber, otp, countryCode = '+968') => {
+  try {
+    const storeKey = `${countryCode}${phoneNumber}`;
+    const storedData = otpStore.get(storeKey);
+    
+    if (!storedData) {
+      logger.warn('MOCK OTP verification failed - no stored data', { phoneNumber: storeKey });
+      return {
+        valid: false,
+        error: 'No OTP request found or expired'
+      };
+    }
+    
+    // Check attempts limit
+    if (storedData.attempts >= 3) {
+      otpStore.delete(storeKey);
+      logger.warn('MOCK OTP verification failed - too many attempts', { phoneNumber: storeKey });
+      return {
+        valid: false,
+        error: 'Too many verification attempts'
+      };
+    }
+    
+    // Increment attempts
+    storedData.attempts += 1;
+    otpStore.set(storeKey, storedData);
+    
+    // MOCK: Accept any 4-digit code or '1234' for testing
+    logger.info('MOCK OTP verification', { 
+      phoneNumber: storeKey, 
+      attempt: storedData.attempts,
+      otp: otp
+    });
+    
+    const isValidOTP = /^\d{4}$/.test(otp) || otp === '1234';
+    
+    if (isValidOTP) {
+      otpStore.delete(storeKey);
+      logger.info('MOCK OTP verified successfully', { phoneNumber: storeKey });
+      return {
+        valid: true,
+        success: true
+      };
+    }
+    
+    return {
+      valid: false,
+      error: 'Invalid OTP code'
+    };
+  } catch (error) {
+    logger.error('MOCK Verify OTP error', { error: error.message, phoneNumber: `${countryCode}${phoneNumber}` });
+    return {
+      valid: false,
+      error: error.message
+    };
+  }
+};
+
+// OMANTEL OTP SEND - Commented out for testing
+/*
+const sendOTP = async (phoneNumber, countryCode = '+968') => {
+  try {
+    logger.info('Sending OTP via Omantel', { phoneNumber: `${countryCode}${phoneNumber}` });
+    
+    const result = await omantelOTPService.sendOTP(phoneNumber, countryCode);
+    
+    if (result.success) {
+      // Store authenticationId temporarily
+      const storeKey = `${countryCode}${phoneNumber}`;
+      otpStore.set(storeKey, {
+        authenticationId: result.authenticationId,
+        timestamp: Date.now(),
+        attempts: 0
+      });
+      
+      // Clean up after 10 minutes
+      setTimeout(() => {
+        otpStore.delete(storeKey);
+        logger.debug('OTP store cleaned up', { phoneNumber: storeKey });
+      }, 10 * 60 * 1000);
+
+      return {
+        success: true,
+        message: 'OTP sent successfully via Omantel'
+      };
+    }
+    
+    return result;
+  } catch (error) {
+    logger.error('Send OTP error', { error: error.message, phoneNumber: `${countryCode}${phoneNumber}` });
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+*/
+
+/**
+ * MOCK OTP SEND - For testing purposes
+ * Remove this and uncomment Omantel version above for production
  */
 const sendOTP = async (phoneNumber, countryCode = '+968') => {
-  // TODO: Replace with actual SMS provider integration
-  // For now, generate and return OTP for development
-  
-  const otp = generateOTP(6);
-  
-  // Mock SMS sending
-  console.log(`📱 Mock SMS sent to ${countryCode}${phoneNumber}: Your OTP is ${otp}`);
-  
-  return {
-    success: true,
-    message: 'OTP sent successfully',
-    otp: process.env.NODE_ENV === 'development' ? otp : undefined // Only return OTP in development
-  };
+  try {
+    logger.info('MOCK Sending OTP', { phoneNumber: `${countryCode}${phoneNumber}` });
+    
+    // Simulate successful OTP send
+    const storeKey = `${countryCode}${phoneNumber}`;
+    const mockAuthId = `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    otpStore.set(storeKey, {
+      authenticationId: mockAuthId,
+      timestamp: Date.now(),
+      attempts: 0
+    });
+    
+    // Clean up after 10 minutes
+    setTimeout(() => {
+      otpStore.delete(storeKey);
+      logger.debug('MOCK OTP store cleaned up', { phoneNumber: storeKey });
+    }, 10 * 60 * 1000);
+
+    logger.info('MOCK OTP sent successfully', { 
+      phoneNumber: `${countryCode}${phoneNumber}`,
+      mockAuthId: mockAuthId 
+    });
+
+    return {
+      success: true,
+      message: 'MOCK OTP sent successfully (use any 4-digit code or 1234)'
+    };
+  } catch (error) {
+    logger.error('MOCK Send OTP error', { error: error.message, phoneNumber: `${countryCode}${phoneNumber}` });
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 };
 
 /**
@@ -279,7 +431,6 @@ module.exports = {
   verifyAccessToken,
   verifyRefreshToken,
   refreshAccessToken,
-  generateOTP,
   verifyOTP,
   sendOTP,
   authenticateToken,

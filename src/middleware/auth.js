@@ -1,11 +1,12 @@
 const { verifyAccessToken } = require('../utils/auth');
+const User = require('../models/User');
 
 /**
  * Authentication Middleware
  * Extracts userId from JWT token and adds it to request object
  */
 
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,13 +26,38 @@ const authenticateToken = (req, res, next) => {
     });
   }
 
-  // Add user info to request
-  req.user = {
-    userId: result.payload.userId,
-    userType: result.payload.userType
-  };
+  try {
+    // Check if user is suspended
+    const user = await User.findById(result.payload.userId);
+    if (user && user.isSuspended()) {
+      return res.status(403).json({
+        success: false,
+        message: user.isPermanentlyBanned 
+          ? 'Account permanently banned' 
+          : 'Account suspended',
+        error: 'ACCOUNT_SUSPENDED',
+        data: {
+          isSuspended: true,
+          isPermanentlyBanned: user.isPermanentlyBanned,
+          suspendedUntil: user.suspendedUntil
+        }
+      });
+    }
 
-  next();
+    // Add user info to request
+    req.user = {
+      userId: result.payload.userId,
+      userType: result.payload.userType
+    };
+
+    next();
+  } catch (error) {
+    console.error('Error checking user suspension in auth middleware:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
 };
 
 /**

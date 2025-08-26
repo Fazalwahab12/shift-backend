@@ -11,6 +11,53 @@ const { validationResult } = require('express-validator');
 class UserJourneyController {
 
   /**
+   * Get complete user journey status for authenticated user
+   * GET /api/journey/me
+   */
+  static async getCurrentUserJourneyStatus(req, res) {
+    try {
+      const { userId } = req.user; // From auth middleware
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Check suspension status
+      const isSuspended = user.isSuspended();
+      if (isSuspended) {
+        return res.status(403).json({
+          success: false,
+          message: user.isPermanentlyBanned 
+            ? 'Account permanently banned' 
+            : 'Account suspended',
+          error: 'ACCOUNT_SUSPENDED',
+          data: {
+            isSuspended: true,
+            isPermanentlyBanned: user.isPermanentlyBanned,
+            suspendedUntil: user.suspendedUntil
+          }
+        });
+      }
+
+      // Call the existing method with the user ID
+      req.params.userId = userId;
+      return UserJourneyController.getUserJourneyStatus(req, res);
+
+    } catch (error) {
+      console.error('Error in getCurrentUserJourneyStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
    * Get complete user journey status
    * GET /api/journey/:userId
    */
@@ -82,6 +129,13 @@ class UserJourneyController {
       
       const overallCompletionPercentage = Math.round((completedSteps / steps.length) * 100);
 
+      // Check suspension status
+      const isSuspended = user.isSuspended();
+      if (isSuspended) {
+        canProceed = false;
+        nextStep = user.isPermanentlyBanned ? 'permanently_banned' : 'suspended';
+      }
+
       res.status(200).json({
         success: true,
         message: 'User journey status retrieved successfully',
@@ -92,6 +146,11 @@ class UserJourneyController {
           nextStep,
           canProceed,
           overallCompletionPercentage,
+          suspensionStatus: {
+            isSuspended: isSuspended,
+            isPermanentlyBanned: user.isPermanentlyBanned,
+            suspendedUntil: user.suspendedUntil
+          },
           phoneRegistration: {
             completed: !!user.phoneNumber,
             phoneNumber: user.phoneNumber,
@@ -266,6 +325,128 @@ class UserJourneyController {
 
     } catch (error) {
       console.error('Error in getNextActions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Suspend user account (Admin only)
+   * PUT /api/journey/:userId/suspend
+   */
+  static async suspendUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      await user.suspend();
+
+      res.status(200).json({
+        success: true,
+        message: 'User suspended successfully',
+        data: {
+          userId: user.id,
+          suspendedUntil: user.suspendedUntil,
+          reason
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in suspendUser:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Permanently ban user account (Admin only)
+   * PUT /api/journey/:userId/ban
+   */
+  static async banUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      await user.permanentBan();
+
+      res.status(200).json({
+        success: true,
+        message: 'User permanently banned successfully',
+        data: {
+          userId: user.id,
+          isPermanentlyBanned: user.isPermanentlyBanned,
+          reason
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in banUser:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Remove suspension from user account (Admin only)
+   * PUT /api/journey/:userId/unsuspend
+   */
+  static async unsuspendUser(req, res) {
+    try {
+      const { userId } = req.params;
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      if (user.isPermanentlyBanned) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot unsuspend permanently banned user'
+        });
+      }
+
+      await user.removeSuspension();
+
+      res.status(200).json({
+        success: true,
+        message: 'User suspension removed successfully',
+        data: {
+          userId: user.id,
+          suspendedUntil: user.suspendedUntil
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in unsuspendUser:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
