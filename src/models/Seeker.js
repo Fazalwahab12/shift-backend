@@ -66,9 +66,6 @@ class Seeker {
     this.lastLoginAt = data.lastLoginAt || null;
     this.activityScore = data.activityScore || 100; // Initial score: 100
     this.strikeCount = data.strikeCount || 0; // Strike system for no-shows
-    this.suspendedUntil = data.suspendedUntil || null; // Suspension end date
-    this.isSuspended = data.isSuspended || false;
-    this.isPermanentlyBanned = data.isPermanentlyBanned || false;
     
     // Activity & Statistics Fields (from CSV requirements)
     this.totalJobsAppliedTo = data.totalJobsAppliedTo || 0; // Number of jobs applied to
@@ -277,23 +274,8 @@ class Seeker {
         updatedAt: new Date().toISOString()
       };
 
-      // Apply consequences based on strike count
-      if (newStrikeCount === 2) {
-        // 30-day suspension
-        const suspendUntil = new Date();
-        suspendUntil.setDate(suspendUntil.getDate() + 30);
-        updateData.isSuspended = true;
-        updateData.suspendedUntil = suspendUntil.toISOString();
-        updateData.activityScore = Math.max(0, this.activityScore - 30);
-      } else if (newStrikeCount >= 3) {
-        // Permanent ban
-        updateData.isPermanentlyBanned = true;
-        updateData.isActive = false;
-        updateData.activityScore = 0;
-      } else {
-        // Reduce activity score
-        updateData.activityScore = Math.max(0, this.activityScore - 15);
-      }
+      // Reduce activity score
+      updateData.activityScore = Math.max(0, this.activityScore - 15);
 
       return await this.update(updateData);
     } catch (error) {
@@ -456,7 +438,7 @@ class Seeker {
       numberOfInterviews: this.numberOfInterviews,
       numberOfNoShows: this.numberOfNoShows,
       strikeCount: this.strikeCount,
-      currentStatus: this.isActive ? (this.isSuspended ? 'Suspended' : 'Activated') : 'Deactivated'
+      currentStatus: this.isActive ? 'Activated' : 'Deactivated'
     };
   }
 
@@ -465,8 +447,6 @@ class Seeker {
    */
   isAvailableForJobs() {
     return this.isActive && 
-           !this.isSuspended && 
-           !this.isPermanentlyBanned && 
            this.isProfileComplete &&
            this.acceptedTerms &&
            this.profileConfirmed;
@@ -476,8 +456,6 @@ class Seeker {
    * Get seeker status for display
    */
   getStatus() {
-    if (this.isPermanentlyBanned) return 'banned';
-    if (this.isSuspended) return 'suspended';
     if (!this.isProfileComplete) return 'incomplete';
     if (!this.isActive) return 'inactive';
     if (this.activityScore < 30) return 'low_activity';
@@ -681,8 +659,6 @@ class Seeker {
       filters.push({ field: 'isProfileComplete', operator: '==', value: true });
       filters.push({ field: 'acceptedTerms', operator: '==', value: true });
       filters.push({ field: 'profileConfirmed', operator: '==', value: true });
-      filters.push({ field: 'isSuspended', operator: '==', value: false });
-      filters.push({ field: 'isPermanentlyBanned', operator: '==', value: false });
 
       const seekers = await databaseService.query(
         COLLECTIONS.SEEKERS,
@@ -709,8 +685,6 @@ class Seeker {
         { field: 'preferredLocations', operator: 'array-contains', value: location },
         { field: 'isActive', operator: '==', value: true },
         { field: 'isProfileComplete', operator: '==', value: true },
-        { field: 'isSuspended', operator: '==', value: false },
-        { field: 'isPermanentlyBanned', operator: '==', value: false }
       ], 
       null, // No ordering to avoid composite index issues
       limit);
@@ -733,8 +707,6 @@ class Seeker {
         { field: 'activityScore', operator: '>=', value: 70 },
         { field: 'isActive', operator: '==', value: true },
         { field: 'isProfileComplete', operator: '==', value: true },
-        { field: 'isSuspended', operator: '==', value: false },
-        { field: 'isPermanentlyBanned', operator: '==', value: false }
       ], null, limit);
 
       const seekerInstances = seekers.map(seekerData => new Seeker(seekerData));
@@ -910,9 +882,6 @@ class Seeker {
       lastLoginAt: this.lastLoginAt,
       activityScore: this.activityScore,
       strikeCount: this.strikeCount,
-      suspendedUntil: this.suspendedUntil,
-      isSuspended: this.isSuspended,
-      isPermanentlyBanned: this.isPermanentlyBanned,
       
       // Activity & Statistics Fields
       totalJobsAppliedTo: this.totalJobsAppliedTo,

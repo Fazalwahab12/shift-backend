@@ -122,7 +122,7 @@ class ShiftServer {
       ...corsOptions,
       origin: process.env.ALLOWED_ORIGINS ? 
         process.env.ALLOWED_ORIGINS.split(',') : 
-        ['http://localhost:3000', 'https://localhost:3000']
+        ['http://localhost:3000', 'https://localhost:3000','http://192.168.42.51:3000']
     };
     this.app.use(cors(railwayCorsOptions));
     

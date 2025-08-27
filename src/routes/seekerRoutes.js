@@ -26,24 +26,24 @@ router.post('/', authenticateToken, [
     .withMessage('ID number must be between 1 and 20 characters'),
   body('dateOfBirth')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Date of birth must be between 1 and 50 characters'),
+    .isString()
+    .withMessage('Date of birth must be a string'),
   body('gender')
     .optional()
     .isIn(['Male', 'Female'])
     .withMessage('Gender must be Male or Female'),
   body('mobileNumber')
     .optional()
-    .matches(/^\+968-\d{8}$/)
-    .withMessage('Mobile number must be in format +968-XXXXXXXX'),
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Mobile number must be between 8 and 15 characters'),
   body('email')
     .optional()
     .isEmail()
     .withMessage('Please provide a valid email address'),
   body('profilePhoto')
     .optional()
-    .isURL()
-    .withMessage('Profile photo must be a valid URL'),
+    .isString()
+    .withMessage('Profile photo must be a string'),
   body('bio')
     .optional()
     .isLength({ max: 500 })
@@ -84,11 +84,11 @@ router.post('/', authenticateToken, [
     .withMessage('Availability must be one of the valid options'),
   body('currentStatus')
     .optional()
-    .isIn(['Student', 'Graduate', 'Working', 'Unemployed', 'Other'])
+    .isIn(['Student', 'Working', 'Not Working'])
     .withMessage('Current status must be one of the valid options'),
   body('workType')
     .optional()
-    .isIn(['Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'])
+    .isIn(['Hourly Work', 'Short-Term Hire', 'Full-Time Work'])
     .withMessage('Work type must be one of the valid options'),
   body('preferredLocations')
     .optional()
@@ -156,8 +156,8 @@ router.put('/:seekerId', authenticateToken, [
     .withMessage('ID number must be between 1 and 20 characters'),
   body('dateOfBirth')
     .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Date of birth must be between 1 and 50 characters'),
+    .isISO8601()
+    .withMessage('Date of birth must be a valid date in YYYY-MM-DD format'),
   body('gender')
     .optional()
     .isIn(['Male', 'Female'])
