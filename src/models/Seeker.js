@@ -911,8 +911,13 @@ class Seeker {
       id: this.id,
       userId: this.userId,
       
-      // Personal Information (safe fields only)
+      // Personal Information (including previously missing fields)
       fullName: this.fullName,
+      idNumber: this.idNumber,
+      dateOfBirth: this.dateOfBirth,
+      gender: this.gender,
+      mobileNumber: this.mobileNumber,
+      email: this.email,
       profilePhoto: this.profilePhoto,
       profileVideo: this.profileVideo, // Only show if published
       bio: this.bio,
@@ -925,9 +930,11 @@ class Seeker {
       yearsOfExperience: this.yearsOfExperience,
       skills: this.skills,
       previousWorkplaces: this.previousWorkplaces,
+      certificates: this.certificates,
       
       // Availability & Preferences
       availability: this.availability,
+      currentStatus: this.currentStatus,
       workType: this.workType,
       preferredLocations: this.preferredLocations,
       languages: this.languages,
