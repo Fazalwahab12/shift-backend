@@ -2,46 +2,41 @@ const { databaseService, COLLECTIONS } = require('../config/database');
 
 /**
  * Company Profile Model - Professional Implementation
- * Enhanced with Payment History CSV structure and Pricing Plans
+ * 
  */
 class Company {
   constructor(data = {}) {
     this.id = data.id || null;
     this.userId = data.userId || null;
     
-    // STEP 1: Company Information & Admin Details (Based on CSV Structure)
     this.companyName = data.companyName || null;
     this.crNumber = data.crNumber || null;
     
-    // Enhanced Admin Details (Matching CSV columns)
     this.adminDetails = data.adminDetails || {
-      fullName: null, // Admin column from CSV
+      fullName: null, 
       role: null,
-      phone: null, // Admin Phone Number column from CSV
-      email: null, // Admin Email column from CSV
+      phone: null, 
+      email: null, 
       position: null,
-      department: null,
-      isPrimaryContact: true
+      
     };
     
-    // CSV-specific fields
-    this.companyNumber = data.companyNumber || null; // No. column from CSV
-    this.industry = data.industry || null; // Industry column from CSV
-    this.roles = data.roles || []; // Roles column from CSV
-    this.registrationDate = data.registrationDate || new Date().toISOString(); // Registration Date column from CSV
-    this.numberOfBands = data.numberOfBands || 1; // No. of Bands / Business Entities column from CSV
-    this.numberOfBranches = data.numberOfBranches || 1; // No. of Branches column from CSV
-    this.lastActiveDate = data.lastActiveDate || null; // Last Active Date column from CSV
-    this.numberOfJobPosts = data.numberOfJobPosts || 0; // Number of Job Posts column from CSV
-    this.totalInstantHires = data.totalInstantHires || 0; // Total Instant Hires column from CSV
-    this.totalInterviews = data.totalInterviews || 0; // Total Interviews column from CSV
-    this.spentOnHiring = data.spentOnHiring || 0; // Spent on Hiring column from CSV
-    this.usedFreeTrial = data.usedFreeTrial || false; // Used Free Trial? column from CSV
-    this.previousPlansPurchases = data.previousPlansPurchases || []; // Previous Plans Purchases column from CSV
+    this.companyNumber = data.companyNumber || null; 
+    this.industry = data.industry || null; 
+    this.roles = data.roles || []; 
+    this.registrationDate = data.registrationDate || new Date().toISOString(); 
+    this.numberOfBands = data.numberOfBands || 1; 
+    this.numberOfBranches = data.numberOfBranches || 1;
+    this.lastActiveDate = data.lastActiveDate || null;
+    this.numberOfJobPosts = data.numberOfJobPosts || 0; 
+    this.totalInstantHires = data.totalInstantHires || 0;
+    this.totalInterviews = data.totalInterviews || 0;
+    this.spentOnHiring = data.spentOnHiring || 0; 
+    this.usedFreeTrial = data.usedFreeTrial || false; 
+    this.previousPlansPurchases = data.previousPlansPurchases || [];
     
-    // Enhanced Company Analytics from CSV Data
     this.companyAnalytics = data.companyAnalytics || {
-      // CSV-based metrics
+     
       totalJobPosts: this.numberOfJobPosts || 0,
       totalInstantHires: this.totalInstantHires || 0,
       totalInterviews: this.totalInterviews || 0,
@@ -80,23 +75,23 @@ class Company {
       }
     };
     
-    // Industry Classification (Enhanced for CSV compatibility)
+    // Industry Classification 
     this.industryDetails = data.industryDetails || {
-      primaryIndustry: this.industry || null, // Industry column from CSV
+      primaryIndustry: this.industry || null, 
       secondaryIndustries: [],
       industrySize: null,
       businessType: null,
       specializations: [],
       certifications: [],
-      roles: this.roles || [], // Roles column from CSV
+      roles: this.roles || [], 
       industryCategory: null,
       subIndustry: null
     };
     
-    // Company Structure & Scale (Enhanced for CSV compatibility)
+    // Company Structure & Scale 
     this.organizationStructure = data.organizationStructure || {
-      numberOfBands: this.numberOfBands || 1, // No. of Bands / Business Entities column from CSV
-      numberOfBranches: this.numberOfBranches || 1, // No. of Branches column from CSV
+      numberOfBands: this.numberOfBands || 1, 
+      numberOfBranches: this.numberOfBranches || 1, 
       totalEmployees: null,
       departmentCount: 0,
       hierarchyLevels: 1,
@@ -133,11 +128,11 @@ class Company {
     this.teamMembers = data.teamMembers || [];
     this.maxLocations = data.maxLocations || 1;
     
-    // STEP 4: ENHANCED SUBSCRIPTION & PAYMENT SYSTEM (Based on CSV and Pricing Plans)
+    // STEP 4: ENHANCED SUBSCRIPTION & PAYMENT SYSTEM 
     this.subscriptionPlan = data.subscriptionPlan || 'trial';
     this.subscriptionStatus = data.subscriptionStatus || 'trial';
     
-    // Enhanced Pricing Model (Based on CSV and Pricing Plans)
+    // Enhanced Pricing Model 
     this.pricingDetails = data.pricingDetails || {
       // Free Trial (14 Days On Us!)
       freeTrial: {
@@ -268,16 +263,16 @@ class Company {
     this.trialDaysRemaining = data.trialDaysRemaining || 14;
     this.trialExpired = data.trialExpired || false;
     
-    // ENHANCED PAYMENT INTEGRATION (Based on CSV Structure)
+    // ENHANCED PAYMENT INTEGRATION 
     this.paymentMethods = data.paymentMethods || [];
     this.defaultPaymentMethod = data.defaultPaymentMethod || null;
     
-    // Payment History (Based on CSV Structure)
-    this.paymentHistory = data.paymentHistory || []; // Array of payment transactions
+    // Payment History 
+    this.paymentHistory = data.paymentHistory || []; 
     this.nextBillingDate = data.nextBillingDate || null;
     this.billingCycle = data.billingCycle || 'monthly';
     
-    // Payment Transaction Structure (Matching CSV)
+    // Payment Transaction Structure 
     this.paymentTransactionStructure = {
       transactionId: null, // Unique transaction ID
       payerName: null, // Company name
@@ -437,7 +432,7 @@ class Company {
   }
   
   /**
-   * Add payment transaction to history (Based on CSV structure)
+   * Add payment transaction to history
    */
   async addPaymentTransaction(transactionData) {
     try {
