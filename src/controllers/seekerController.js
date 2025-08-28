@@ -258,7 +258,7 @@ class SeekerController {
       });
 
     } catch (error) {
-      console.error('Error in updateProfileStep:', error);
+    
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -341,7 +341,7 @@ class SeekerController {
       });
 
     } catch (error) {
-      console.error('Error in searchSeekers:', error);
+     
       res.status(500).json({
         success: false,
         message: 'Internal server error',

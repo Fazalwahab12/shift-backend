@@ -55,7 +55,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in createJob:', error);
+      
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -108,7 +108,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in updateJobStep:', error);
+      
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -167,7 +167,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in publishJob:', error);
+      
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -205,7 +205,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in getJobById:', error);
+      
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -251,7 +251,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in getJobsByCompany:', error);
+    
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -304,7 +304,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in searchJobs:', error);
+ 
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -348,7 +348,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in updateJob:', error);
+     
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -388,7 +388,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in toggleJobStatus:', error);
+   
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -426,7 +426,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in deleteJob:', error);
+     
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -471,7 +471,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in copyJob:', error);
+    
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -497,7 +497,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in getJobStats:', error);
+     
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -539,7 +539,7 @@ class JobController {
       });
 
     } catch (error) {
-      console.error('Error in getTrendingJobs:', error);
+    
       res.status(500).json({
         success: false,
         message: 'Internal server error',
