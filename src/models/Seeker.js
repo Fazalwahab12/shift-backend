@@ -945,7 +945,7 @@ class Seeker {
       activityScore: this.activityScore,
       status: this.getStatus(),
       profileCompletionPercentage: this.getProfileCompletionPercentage(),
-      isAvailableForJobs: this.isAvailableForJobs(),
+      isAvailableForJobs: this.isAvailableForJobs,
       
       // Timestamps
       createdAt: this.createdAt,
@@ -1002,7 +1002,7 @@ class Seeker {
       activityScore: this.activityScore,
       strikeCount: this.strikeCount,
       status: this.getStatus(),
-      isAvailableForJobs: this.isAvailableForJobs(),
+      isAvailableForJobs: this.isAvailableForJobs,
       
       // Timestamps
       createdAt: this.createdAt,

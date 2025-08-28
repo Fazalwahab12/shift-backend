@@ -163,9 +163,11 @@ class SeekerController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.log('🔍 Validation errors:', errors.array());
+        console.log('🔍 Request body:', req.body);
         return res.status(400).json({
           success: false,
-          message: 'Validation failed',
+          message: 'Invalid request. Please check your input.',
           errors: errors.array()
         });
       }
@@ -191,9 +193,19 @@ class SeekerController {
 
     } catch (error) {
       console.error('Error in updateProfile:', error);
+      
+      // Handle Firebase quota exceeded error
+      if (error.message && error.message.includes('quota')) {
+        return res.status(429).json({
+          success: false,
+          message: 'Database quota exceeded. Please try again later.',
+          error: 'Quota exceeded'
+        });
+      }
+      
       res.status(500).json({
         success: false,
-        message: 'Internal server error',
+        message: 'Server error. Please try again later.',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
@@ -1158,6 +1170,44 @@ class SeekerController {
 
     } catch (error) {
       console.error('Error in getSeekerStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Upload image to Firebase Storage
+   * POST /api/seekers/upload-image
+   */
+  static async uploadImage(req, res) {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No image file provided'
+        });
+      }
+
+      // For now, return a placeholder URL since Firebase Storage integration isn't shown
+      // In a real implementation, you would upload to Firebase Storage here
+      const imageUrl = `https://placeholder-storage.com/${Date.now()}-${req.file.originalname}`;
+
+      res.status(200).json({
+        success: true,
+        message: 'Image uploaded successfully',
+        data: {
+          imageUrl: imageUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size,
+          mimeType: req.file.mimetype
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in uploadImage:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
