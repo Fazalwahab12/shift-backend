@@ -46,7 +46,24 @@ router.post('/', authenticateToken, [
   body('establishedYear')
     .optional()
     .isInt({ min: 1900, max: new Date().getFullYear() })
-    .withMessage('Established year must be between 1900 and current year')
+    .withMessage('Established year must be between 1900 and current year'),
+  // Add contact person validation fields
+  body('contactPerson')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Contact person name must be between 1 and 100 characters'),
+  body('contactEmail')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid contact email address'),
+  body('contactPhone')
+    .optional()
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Contact phone must be between 8 and 15 characters'),
+  body('contactRole')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Contact role must be between 1 and 50 characters')
 ], CompanyController.createProfile);
 
 /**
