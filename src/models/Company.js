@@ -11,13 +11,15 @@ class Company {
     
     this.companyName = data.companyName || null;
     this.crNumber = data.crNumber || null;
+    this.companyType = data.companyType || null;
+    this.geographicalPresence = data.geographicalPresence || null;
     
     this.adminDetails = data.adminDetails || {
-      fullName: null, 
-      role: null,
-      phone: null, 
-      email: null, 
-      position: null,
+      fullName: data.contactPerson || null, 
+      role: data.contactRole || null,
+      phone: data.contactPhone || null, 
+      email: data.contactEmail || null, 
+      position: data.contactRole || null,
       
     };
     
@@ -1331,7 +1333,21 @@ class Company {
         throw new Error('Cannot update company without ID');
       }
 
-      const updatedCompany = await databaseService.update(COLLECTIONS.COMPANIES, this.id, updateData);
+      // Map contact fields to adminDetails if they're provided
+      const processedUpdateData = { ...updateData };
+      
+      if (updateData.contactPerson || updateData.contactEmail || updateData.contactPhone || updateData.contactRole) {
+        processedUpdateData.adminDetails = {
+          ...this.adminDetails,
+          fullName: updateData.contactPerson || this.adminDetails?.fullName,
+          email: updateData.contactEmail || this.adminDetails?.email,
+          phone: updateData.contactPhone || this.adminDetails?.phone,
+          role: updateData.contactRole || this.adminDetails?.role,
+          position: updateData.contactRole || this.adminDetails?.position
+        };
+      }
+
+      const updatedCompany = await databaseService.update(COLLECTIONS.COMPANIES, this.id, processedUpdateData);
       Object.assign(this, updatedCompany);
       return this;
     } catch (error) {
@@ -1496,6 +1512,8 @@ class Company {
       companyName: this.companyName,
       crNumber: this.crNumber,
       companyNumber: this.companyNumber,
+      companyType: this.companyType,
+      geographicalPresence: this.geographicalPresence,
       adminDetails: this.adminDetails,
       
       // CSV-specific fields
@@ -1611,6 +1629,8 @@ class Company {
       companyName: this.companyName,
       companyNumber: this.companyNumber,
       crNumber: this.crNumber,
+      companyType: this.companyType,
+      geographicalPresence: this.geographicalPresence,
       
       // Admin information
       adminDetails: {
@@ -1619,6 +1639,12 @@ class Company {
         email: this.adminDetails?.email,
         role: this.adminDetails?.role
       },
+      
+      // Contact fields for API compatibility
+      contactPerson: this.adminDetails?.fullName,
+      contactPhone: this.adminDetails?.phone,
+      contactEmail: this.adminDetails?.email,
+      contactRole: this.adminDetails?.role,
       
       // Business structure
       numberOfBands: this.numberOfBands,
@@ -1646,6 +1672,11 @@ class Company {
         industry: brand.industry
       })),
       primaryBrand: this.primaryBrand,
+      
+      // Business locations and team
+      locations: this.locations,
+      teamMembers: this.teamMembers,
+      maxLocations: this.maxLocations,
       
       // Industry & Organization Info
       industryDetails: {
@@ -1734,6 +1765,8 @@ class Company {
       companyName: this.companyName,
       companyNumber: this.companyNumber,
       crNumber: this.crNumber,
+      companyType: this.companyType,
+      geographicalPresence: this.geographicalPresence,
       adminDetails: this.adminDetails,
       
       // CSV-specific fields

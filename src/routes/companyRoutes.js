@@ -63,7 +63,15 @@ router.post('/', authenticateToken, [
   body('contactRole')
     .optional()
     .isLength({ min: 1, max: 50 })
-    .withMessage('Contact role must be between 1 and 50 characters')
+    .withMessage('Contact role must be between 1 and 50 characters'),
+  body('companyType')
+    .optional()
+    .isIn(['SME', 'Corporate'])
+    .withMessage('Company type must be SME or Corporate'),
+  body('geographicalPresence')
+    .optional()
+    .isIn(['Local', 'Regional', 'Global'])
+    .withMessage('Geographical presence must be Local, Regional, or Global')
 ], CompanyController.createProfile);
 
 /**
@@ -120,7 +128,32 @@ router.put('/:companyId', authenticateToken, [
   body('website')
     .optional()
     .isURL()
-    .withMessage('Please provide a valid website URL')
+    .withMessage('Please provide a valid website URL'),
+  // Contact person validation fields
+  body('contactPerson')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Contact person name must be between 1 and 100 characters'),
+  body('contactEmail')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid contact email address'),
+  body('contactPhone')
+    .optional()
+    .isLength({ min: 8, max: 15 })
+    .withMessage('Contact phone must be between 8 and 15 characters'),
+  body('contactRole')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Contact role must be between 1 and 50 characters'),
+  body('companyType')
+    .optional()
+    .isIn(['SME', 'Corporate'])
+    .withMessage('Company type must be SME or Corporate'),
+  body('geographicalPresence')
+    .optional()
+    .isIn(['Local', 'Regional', 'Global'])
+    .withMessage('Geographical presence must be Local, Regional, or Global')
 ], CompanyController.updateProfile);
 
 /**
