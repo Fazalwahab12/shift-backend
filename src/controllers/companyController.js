@@ -2023,6 +2023,620 @@ class CompanyController {
       });
     }
   }
+
+  // ===================================
+  // JOB POSTING METHODS FOR COMPANIES
+  // ===================================
+
+  /**
+   * Create new job posting (Step 1: Basic Info)
+   * POST /api/companies/:companyId/jobs
+   */
+  static async createJob(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const jobData = { ...req.body, companyId, userId: req.user.userId };
+
+      // Import Job model at runtime to avoid circular imports
+      const Job = require('../models/Job');
+
+      // Verify company exists and user has permission
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Verify user owns this company
+      if (company.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to create jobs for this company'
+        });
+      }
+
+      const job = await Job.create(companyId, jobData);
+
+      res.status(201).json({
+        success: true,
+        message: 'Job created successfully',
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error creating job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Update job step
+   * PUT /api/companies/:companyId/jobs/:jobId/step/:step
+   */
+  static async updateJobStep(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId, jobId, step } = req.params;
+      const updateData = req.body;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      await job.update(updateData);
+
+      res.status(200).json({
+        success: true,
+        message: `Job step ${step} updated successfully`,
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error updating job step:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Publish job (Final step)
+   * POST /api/companies/:companyId/jobs/:jobId/publish
+   */
+  static async publishJob(req, res) {
+    try {
+      const { companyId, jobId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      if (!job.canPublish()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Job missing required fields for publishing',
+          data: {
+            jobStatus: job.jobStatus,
+            missingFields: job.getMissingFields ? job.getMissingFields() : []
+          }
+        });
+      }
+
+      await job.publish();
+
+      res.status(200).json({
+        success: true,
+        message: 'Job published successfully',
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error publishing job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company jobs
+   * GET /api/companies/:companyId/jobs
+   */
+  static async getCompanyJobs(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { limit = 10, offset = 0, status } = req.query;
+
+      const Job = require('../models/Job');
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      let jobs = await Job.findByCompanyId(companyId, parseInt(limit), parseInt(offset));
+
+      // Filter by status if provided
+      if (status) {
+        jobs = jobs.filter(job => job.jobStatus === status);
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Jobs retrieved successfully',
+        data: {
+          jobs: jobs.map(job => job.toJSON()),
+          totalJobs: jobs.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          companyName: company.companyName
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting company jobs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get job by ID
+   * GET /api/companies/:companyId/jobs/:jobId
+   */
+  static async getJobById(req, res) {
+    try {
+      const { companyId, jobId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Job retrieved successfully',
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error getting job by ID:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Update job
+   * PUT /api/companies/:companyId/jobs/:jobId
+   */
+  static async updateJob(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId, jobId } = req.params;
+      const updateData = req.body;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      await job.update(updateData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Job updated successfully',
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error updating job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Toggle job status (pause/resume)
+   * PUT /api/companies/:companyId/jobs/:jobId/toggle-status
+   */
+  static async toggleJobStatus(req, res) {
+    try {
+      const { companyId, jobId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      const newStatus = job.jobStatus === 'published' ? 'paused' : 'published';
+      await job.update({ jobStatus: newStatus });
+
+      res.status(200).json({
+        success: true,
+        message: `Job ${newStatus} successfully`,
+        data: job.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error toggling job status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Delete job
+   * DELETE /api/companies/:companyId/jobs/:jobId
+   */
+  static async deleteJob(req, res) {
+    try {
+      const { companyId, jobId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (job.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      await job.delete();
+
+      res.status(200).json({
+        success: true,
+        message: 'Job deleted successfully',
+        data: {
+          id: job.id,
+          jobId: job.jobId,
+          isActive: job.isActive
+        }
+      });
+
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Copy job
+   * POST /api/companies/:companyId/jobs/:jobId/copy
+   */
+  static async copyJob(req, res) {
+    try {
+      const { companyId, jobId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const originalJob = await Job.findById(jobId);
+      if (!originalJob) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Verify job belongs to this company
+      if (originalJob.companyId !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Job does not belong to this company'
+        });
+      }
+
+      // Create copy with modified data
+      const jobData = originalJob.toJSON();
+      delete jobData.id;
+      delete jobData.publishedAt;
+      delete jobData.applicationsCount;
+      delete jobData.viewsCount;
+      delete jobData.hiredCount;
+      
+      jobData.jobStatus = 'draft';
+      jobData.jobSummary = `${jobData.jobSummary} (Copy)`;
+
+      const copiedJob = await Job.create(companyId, jobData);
+
+      res.status(201).json({
+        success: true,
+        message: 'Job copied successfully',
+        data: copiedJob.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error copying job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company job statistics
+   * GET /api/companies/:companyId/jobs/stats
+   */
+  static async getCompanyJobStats(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const Job = require('../models/Job');
+
+      const stats = await Job.getStats(companyId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Job statistics retrieved successfully',
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error getting job stats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Placeholder methods for job application management
+   * These would typically integrate with an Application model
+   */
+  static async getJobApplications(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Job applications feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async shortlistCandidate(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Candidate shortlisting feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async scheduleInterview(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Interview scheduling feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async hireCandidate(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Candidate hiring feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async getMatchingSeekers(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Matching seekers feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async getHiringAnalytics(req, res) {
+    try {
+      res.status(501).json({
+        success: false,
+        message: 'Hiring analytics feature not yet implemented'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  static async getCompanyTrendingJobs(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { limit = 5 } = req.query;
+
+      const Job = require('../models/Job');
+
+      // Get company jobs sorted by trending score
+      const jobs = await Job.findByCompanyId(companyId, parseInt(limit), 0);
+      
+      const trendingJobs = jobs
+        .filter(job => job.jobStatus === 'published')
+        .map(job => ({
+          ...job.toJSON(),
+          trendingScore: job.viewsCount + (job.applicationsCount * 2)
+        }))
+        .sort((a, b) => b.trendingScore - a.trendingScore);
+
+      res.status(200).json({
+        success: true,
+        message: 'Trending jobs retrieved successfully',
+        data: {
+          jobs: trendingJobs,
+          limit: parseInt(limit)
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting trending jobs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = CompanyController;

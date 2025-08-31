@@ -27,14 +27,10 @@ router.post('/', [
     .optional()
     .isArray()
     .withMessage('Selected roles must be an array'),
-  body('hiringNeeds')
-    .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Hiring needs must be between 1 and 100 characters'),
-  body('typicalHiringRoles')
+  body('selectedSkills')
     .optional()
     .isArray()
-    .withMessage('Typical hiring roles must be an array'),
+    .withMessage('Selected skills must be an array'),
   body('preferredSocialMedia')
     .optional()
     .isArray()
@@ -42,7 +38,11 @@ router.post('/', [
   body('preferredSocialMedia.*')
     .optional()
     .isLength({ min: 1, max: 100 })
-    .withMessage('Each social media preference must be between 1 and 100 characters')
+    .withMessage('Each social media preference must be between 1 and 100 characters'),
+  body('workLocationPreference')
+    .optional()
+    .isArray()
+    .withMessage('Work location preference must be an array')
 ], OnboardingController.createOrUpdateOnboarding);
 
 /**

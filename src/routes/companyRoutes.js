@@ -771,4 +771,420 @@ router.get('/export/csv', authenticateToken, [
     .withMessage('Used free trial must be true or false')
 ], CompanyController.exportCompaniesToCSV);
 
+// ===================================
+// JOB POSTING ROUTES FOR COMPANIES
+// ===================================
+
+/**
+ * @route   POST /api/companies/:companyId/jobs
+ * @desc    Create new job posting (Step 1: Basic Info)
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('jobVenue')
+    .isIn(['Business Location', 'External Event'])
+    .withMessage('Job venue must be Business Location or External Event'),
+  body('brandLocationId')
+    .optional()
+    .notEmpty()
+    .withMessage('Brand location ID cannot be empty if provided'),
+  body('roleId')
+    .optional()
+    .notEmpty()
+    .withMessage('Role ID cannot be empty if provided'),
+  body('roleName')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Role name must be between 1 and 100 characters'),
+  body('jobSummary')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Job summary must not exceed 1000 characters'),
+  body('dressCode')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Dress code must not exceed 500 characters'),
+  body('jobCoverImage')
+    .optional()
+    .isURL()
+    .withMessage('Job cover image must be a valid URL'),
+  body('dressCodeGuideline')
+    .optional()
+    .isURL()
+    .withMessage('Dress code guideline must be a valid URL')
+], CompanyController.createJob);
+
+/**
+ * @route   PUT /api/companies/:companyId/jobs/:jobId/step/:step
+ * @desc    Update job step (Steps 1-4)
+ * @access  Private (JWT Token Required)
+ */
+router.put('/:companyId/jobs/:jobId/step/:step', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  param('step')
+    .isInt({ min: 1, max: 4 })
+    .withMessage('Step must be between 1 and 4'),
+  
+  // Step 2: Hiring Preference validations
+  body('hiringType')
+    .optional()
+    .isIn(['Instant Hire', 'Interview First'])
+    .withMessage('Hiring type must be Instant Hire or Interview First'),
+  body('shiftTypes')
+    .optional()
+    .isArray()
+    .withMessage('Shift types must be an array'),
+  body('shiftTypes.*')
+    .optional()
+    .isIn(['Morning', 'Afternoon', 'Evening', 'Night'])
+    .withMessage('Invalid shift type'),
+  body('hoursPerDay')
+    .optional()
+    .isInt({ min: 1, max: 24 })
+    .withMessage('Hours per day must be between 1 and 24'),
+  body('payPerHour')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Pay per hour must be a positive number'),
+  body('paymentTerms')
+    .optional()
+    .isIn(['Within 1 Week', 'Within 15 Days', 'Within 30 Days'])
+    .withMessage('Invalid payment terms'),
+  body('workType')
+    .optional()
+    .isIn(['hourly', 'short', 'full'])
+    .withMessage('Work type must be hourly, short, or full'),
+  body('interviewLanguages')
+    .optional()
+    .isArray()
+    .withMessage('Interview languages must be an array'),
+  
+  // Step 3: Requirements validations
+  body('requiredSkills')
+    .optional()
+    .isArray()
+    .withMessage('Required skills must be an array'),
+  body('requiredLanguages')
+    .optional()
+    .isArray()
+    .withMessage('Required languages must be an array'),
+  body('genderPreference')
+    .optional()
+    .isIn(['Male', 'Female', 'Both'])
+    .withMessage('Gender preference must be Male, Female, or Both'),
+  body('jobPerks')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Job perks must not exceed 500 characters')
+], CompanyController.updateJobStep);
+
+/**
+ * @route   POST /api/companies/:companyId/jobs/:jobId/publish
+ * @desc    Publish job (Final step)
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs/:jobId/publish', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], CompanyController.publishJob);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs
+ * @desc    Get all jobs for a company
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater'),
+  query('status')
+    .optional()
+    .isIn(['draft', 'published', 'paused', 'closed'])
+    .withMessage('Status must be draft, published, paused, or closed')
+], CompanyController.getCompanyJobs);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs/:jobId
+ * @desc    Get job by ID
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs/:jobId', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  query('increment_views')
+    .optional()
+    .isBoolean()
+    .withMessage('Increment views must be a boolean')
+], CompanyController.getJobById);
+
+/**
+ * @route   PUT /api/companies/:companyId/jobs/:jobId
+ * @desc    Update job
+ * @access  Private (JWT Token Required)
+ */
+router.put('/:companyId/jobs/:jobId', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('jobSummary')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Job summary must not exceed 1000 characters'),
+  body('payPerHour')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Pay per hour must be a positive number'),
+  body('hoursPerDay')
+    .optional()
+    .isInt({ min: 1, max: 24 })
+    .withMessage('Hours per day must be between 1 and 24')
+], CompanyController.updateJob);
+
+/**
+ * @route   PUT /api/companies/:companyId/jobs/:jobId/toggle-status
+ * @desc    Toggle job status (pause/resume)
+ * @access  Private (JWT Token Required)
+ */
+router.put('/:companyId/jobs/:jobId/toggle-status', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], CompanyController.toggleJobStatus);
+
+/**
+ * @route   DELETE /api/companies/:companyId/jobs/:jobId
+ * @desc    Delete job (soft delete)
+ * @access  Private (JWT Token Required)
+ */
+router.delete('/:companyId/jobs/:jobId', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], CompanyController.deleteJob);
+
+/**
+ * @route   POST /api/companies/:companyId/jobs/:jobId/copy
+ * @desc    Copy job (create duplicate)
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs/:jobId/copy', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], CompanyController.copyJob);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs/stats
+ * @desc    Get job statistics for company
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs/stats', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getCompanyJobStats);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs/:jobId/applications
+ * @desc    Get job applications
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs/:jobId/applications', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater'),
+  query('status')
+    .optional()
+    .isIn(['applied', 'interviewed', 'hired', 'rejected'])
+    .withMessage('Status must be applied, interviewed, hired, or rejected')
+], CompanyController.getJobApplications);
+
+/**
+ * @route   POST /api/companies/:companyId/jobs/:jobId/shortlist
+ * @desc    Shortlist or reject candidate
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs/:jobId/shortlist', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('action')
+    .isIn(['shortlist', 'reject'])
+    .withMessage('Action must be shortlist or reject')
+], CompanyController.shortlistCandidate);
+
+/**
+ * @route   POST /api/companies/:companyId/jobs/:jobId/schedule-interview
+ * @desc    Schedule interview with candidate
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs/:jobId/schedule-interview', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('interviewDate')
+    .isISO8601()
+    .withMessage('Interview date must be a valid ISO date'),
+  body('interviewTime')
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('Interview time must be in HH:MM format'),
+  body('interviewType')
+    .isIn(['in-person', 'phone', 'video'])
+    .withMessage('Interview type must be in-person, phone, or video'),
+  body('location')
+    .optional()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Location must be between 1 and 200 characters'),
+  body('notes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Notes must not exceed 500 characters')
+], CompanyController.scheduleInterview);
+
+/**
+ * @route   POST /api/companies/:companyId/jobs/:jobId/hire
+ * @desc    Hire candidate
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/jobs/:jobId/hire', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  body('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('startDate')
+    .isISO8601()
+    .withMessage('Start date must be a valid ISO date'),
+  body('salary')
+    .isFloat({ min: 0 })
+    .withMessage('Salary must be a positive number'),
+  body('workSchedule')
+    .optional()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Work schedule must be between 1 and 200 characters'),
+  body('notes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Notes must not exceed 500 characters')
+], CompanyController.hireCandidate);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs/:jobId/matching-seekers
+ * @desc    Get matching seekers for job
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs/:jobId/matching-seekers', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater'),
+  query('minScore')
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Minimum score must be between 0 and 100')
+], CompanyController.getMatchingSeekers);
+
+/**
+ * @route   GET /api/companies/:companyId/dashboard/hiring-analytics
+ * @desc    Get hiring analytics dashboard data
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/dashboard/hiring-analytics', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  query('period')
+    .optional()
+    .isIn(['week', 'month', 'quarter', 'year'])
+    .withMessage('Period must be week, month, quarter, or year')
+], CompanyController.getHiringAnalytics);
+
+/**
+ * @route   GET /api/companies/:companyId/jobs/trending
+ * @desc    Get company's trending jobs
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/jobs/trending', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 20 })
+    .withMessage('Limit must be between 1 and 20')
+], CompanyController.getCompanyTrendingJobs);
+
 module.exports = router;

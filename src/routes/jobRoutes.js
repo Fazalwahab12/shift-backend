@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const JobController = require('../controllers/jobController');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,9 +13,9 @@ const router = express.Router();
 /**
  * @route   POST /api/jobs
  * @desc    Create new job (Step 1: Basic Info)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/', [
+router.post('/', authenticateToken, [
   body('companyId')
     .notEmpty()
     .withMessage('Company ID is required'),
@@ -57,9 +58,9 @@ router.post('/', [
 /**
  * @route   PUT /api/jobs/:jobId/step/:step
  * @desc    Update job step (Steps 1-4)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:jobId/step/:step', [
+router.put('/:jobId/step/:step', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required'),
@@ -123,9 +124,9 @@ router.put('/:jobId/step/:step', [
 /**
  * @route   POST /api/jobs/:jobId/publish
  * @desc    Publish job (Final step)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:jobId/publish', [
+router.post('/:jobId/publish', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required')
@@ -208,9 +209,9 @@ router.get('/search', [
 /**
  * @route   PUT /api/jobs/:jobId
  * @desc    Update job
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:jobId', [
+router.put('/:jobId', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required'),
@@ -231,9 +232,9 @@ router.put('/:jobId', [
 /**
  * @route   PUT /api/jobs/:jobId/toggle-status
  * @desc    Pause/Resume job
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.put('/:jobId/toggle-status', [
+router.put('/:jobId/toggle-status', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required')
@@ -242,9 +243,9 @@ router.put('/:jobId/toggle-status', [
 /**
  * @route   DELETE /api/jobs/:jobId
  * @desc    Delete job (soft delete)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.delete('/:jobId', [
+router.delete('/:jobId', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required')
@@ -253,9 +254,9 @@ router.delete('/:jobId', [
 /**
  * @route   POST /api/jobs/:jobId/copy
  * @desc    Copy job (create duplicate)
- * @access  Public
+ * @access  Private (JWT Token Required)
  */
-router.post('/:jobId/copy', [
+router.post('/:jobId/copy', authenticateToken, [
   param('jobId')
     .notEmpty()
     .withMessage('Job ID is required')

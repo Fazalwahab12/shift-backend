@@ -12,12 +12,10 @@ class OnboardingData {
     // Industry and Role Preferences
     this.selectedIndustries = data.selectedIndustries || [];
     this.selectedRoles = data.selectedRoles || [];
-    this.hiringNeeds = data.hiringNeeds || null; // For companies
-    this.typicalHiringRoles = data.typicalHiringRoles || []; // For companies
+    this.selectedSkills = data.selectedSkills || [];
     
     // Additional preferences
     this.workLocationPreference = data.workLocationPreference || [];
-    this.salaryExpectations = data.salaryExpectations || {};
     this.preferredSocialMedia = data.preferredSocialMedia || [];
     
     // Removed completion tracking - onboarding goes directly to profile creation
@@ -271,10 +269,8 @@ class OnboardingData {
       userType: this.userType,
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
-      hiringNeeds: this.hiringNeeds,
-      typicalHiringRoles: this.typicalHiringRoles,
+      selectedSkills: this.selectedSkills,
       workLocationPreference: this.workLocationPreference,
-      salaryExpectations: this.salaryExpectations,
       preferredSocialMedia: this.preferredSocialMedia
     };
   }
@@ -283,22 +279,16 @@ class OnboardingData {
    * Convert to public JSON (safe for API responses) - only essential fields
    */
   toPublicJSON() {
-    const result = {
+    return {
       id: this.id,
       userId: this.userId,
       userType: this.userType,
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
+      selectedSkills: this.selectedSkills,
+      workLocationPreference: this.workLocationPreference,
       preferredSocialMedia: this.preferredSocialMedia
     };
-
-    // Only add company-specific fields if userType is company
-    if (this.userType === 'company') {
-      result.hiringNeeds = this.hiringNeeds;
-      result.typicalHiringRoles = this.typicalHiringRoles;
-    }
-
-    return result;
   }
 }
 
