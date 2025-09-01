@@ -39,10 +39,7 @@ router.post('/', [
     .optional()
     .isLength({ min: 1, max: 100 })
     .withMessage('Each social media preference must be between 1 and 100 characters'),
-  body('workLocationPreference')
-    .optional()
-    .isArray()
-    .withMessage('Work location preference must be an array')
+
 ], OnboardingController.createOrUpdateOnboarding);
 
 /**

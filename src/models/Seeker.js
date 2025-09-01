@@ -1,4 +1,5 @@
 const { databaseService, COLLECTIONS } = require('../config/database');
+const notificationController = require('../controllers/notificationController');
 
 /**
  * Job Seeker Profile Model - Professional Implementation
@@ -105,7 +106,25 @@ class Seeker {
       });
 
       const result = await databaseService.create(COLLECTIONS.SEEKERS, seeker.toJSON());
-      return new Seeker({ id: result.id, ...result });
+      const createdSeeker = new Seeker({ id: result.id, ...result });
+
+      // Send seeker profile created notification
+      try {
+        const seekerData = {
+          id: createdSeeker.id,
+          name: createdSeeker.fullName,
+          firstName: createdSeeker.fullName ? createdSeeker.fullName.split(' ')[0] : 'Job Seeker',
+          lastName: createdSeeker.fullName ? createdSeeker.fullName.split(' ').slice(1).join(' ') : '',
+          email: createdSeeker.email
+        };
+        
+        await notificationController.sendJobSeekerProfileCreated(seekerData);
+        console.log('✅ Seeker creation notification sent successfully');
+      } catch (notificationError) {
+        console.error('⚠️  Failed to send seeker creation notification:', notificationError);
+      }
+
+      return createdSeeker;
     } catch (error) {
       console.error('Error creating seeker profile:', error);
       throw error;
@@ -918,7 +937,7 @@ class Seeker {
       gender: this.gender,
       mobileNumber: this.mobileNumber,
       email: this.email,
-      profilePhoto: this.profilePhoto,
+      profilePhoto: this.profilePhoto && !this.profilePhoto.includes('placeholder-storage.com') ? this.profilePhoto : null,
       profileVideo: this.profileVideo, // Only show if published
       bio: this.bio,
       educationalLevel: this.educationalLevel,
@@ -943,6 +962,8 @@ class Seeker {
       // Status Information
       isVerified: this.isVerified,
       activityScore: this.activityScore,
+      strikeCount: this.strikeCount,
+      videoStatus: this.videoStatus,
       status: this.getStatus(),
       profileCompletionPercentage: this.getProfileCompletionPercentage(),
       isAvailableForJobs: this.isAvailableForJobs,
@@ -951,6 +972,39 @@ class Seeker {
       createdAt: this.createdAt,
       lastLoginAt: this.lastLoginAt
     };
+  }
+
+  /**
+   * Clean up placeholder URLs from profile data
+   */
+  cleanupPlaceholderUrls() {
+    if (this.profilePhoto && this.profilePhoto.includes('placeholder-storage.com')) {
+      this.profilePhoto = null;
+    }
+  }
+
+  /**
+   * Clean up all placeholder URLs from database
+   */
+  static async cleanupAllPlaceholderUrls() {
+    try {
+      const seekers = await Seeker.search({});
+      let cleanedCount = 0;
+      
+      for (const seeker of seekers) {
+        if (seeker.profilePhoto && seeker.profilePhoto.includes('placeholder-storage.com')) {
+          seeker.profilePhoto = null;
+          await seeker.update({ profilePhoto: null });
+          cleanedCount++;
+        }
+      }
+      
+      console.log(`Cleaned up ${cleanedCount} placeholder URLs from seeker profiles`);
+      return cleanedCount;
+    } catch (error) {
+      console.error('Error cleaning up placeholder URLs:', error);
+      throw error;
+    }
   }
 
   /**
@@ -968,7 +1022,7 @@ class Seeker {
       gender: this.gender,
       mobileNumber: this.mobileNumber,
       email: this.email,
-      profilePhoto: this.profilePhoto,
+      profilePhoto: this.profilePhoto && !this.profilePhoto.includes('placeholder-storage.com') ? this.profilePhoto : null,
       profileVideo: this.profileVideo,
       bio: this.bio,
       educationalLevel: this.educationalLevel,

@@ -48,6 +48,9 @@ class JobController {
 
       const job = await Job.create(companyId, req.body);
 
+      // Immediately populate company and location data
+      await job.populateCompanyData();
+
       res.status(201).json({
         success: true,
         message: 'Job created successfully',
@@ -82,7 +85,7 @@ class JobController {
       const { jobId, step } = req.params;
       const updateData = req.body;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -125,7 +128,7 @@ class JobController {
     try {
       const { jobId } = req.params;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -144,26 +147,17 @@ class JobController {
         });
       }
 
+      // Ensure company data is populated before publishing
+      if (!job.companyName || !job.locationAddress) {
+        await job.populateCompanyData();
+      }
+
       await job.publish();
 
       res.status(200).json({
         success: true,
         message: 'Job published successfully',
-        data: {
-          id: job.id,
-          jobId: job.jobId,
-          jobStatus: job.jobStatus,
-          publishedAt: job.publishedAt,
-          jobSummary: job.jobSummary,
-          roleName: job.roleName,
-          companyName: job.companyName,
-          locationAddress: job.locationAddress,
-          hiringType: job.hiringType,
-          payPerHour: job.payPerHour,
-          hoursPerDay: job.hoursPerDay,
-          startDate: job.startDate,
-          startTime: job.startTime
-        }
+        data: job.toJSON() // Return full job data instead of subset
       });
 
     } catch (error) {
@@ -185,12 +179,17 @@ class JobController {
       const { jobId } = req.params;
       const { increment_views } = req.query;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
           message: 'Job not found'
         });
+      }
+
+      // Populate company and location data if missing
+      if (!job.companyName || !job.locationAddress) {
+        await job.populateCompanyData();
       }
 
       // Increment view count if requested
@@ -331,7 +330,7 @@ class JobController {
       const { jobId } = req.params;
       const updateData = req.body;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -365,7 +364,7 @@ class JobController {
     try {
       const { jobId } = req.params;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -405,7 +404,7 @@ class JobController {
     try {
       const { jobId } = req.params;
 
-      const job = await Job.findById(jobId);
+      const job = await Job.findByJobId(jobId);
       if (!job) {
         return res.status(404).json({
           success: false,
@@ -443,7 +442,7 @@ class JobController {
     try {
       const { jobId } = req.params;
 
-      const originalJob = await Job.findById(jobId);
+      const originalJob = await Job.findByJobId(jobId);
       if (!originalJob) {
         return res.status(404).json({
           success: false,

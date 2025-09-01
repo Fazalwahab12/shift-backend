@@ -1,4 +1,5 @@
 const { databaseService, COLLECTIONS } = require('../config/database');
+const notificationController = require('../controllers/notificationController');
 
 /**
  * Company Profile Model - Professional Implementation
@@ -271,6 +272,7 @@ class Company {
     
     // Payment History 
     this.paymentHistory = data.paymentHistory || []; 
+    this.pendingPayments = data.pendingPayments || [];
     this.nextBillingDate = data.nextBillingDate || null;
     this.billingCycle = data.billingCycle || 'monthly';
     
@@ -368,7 +370,7 @@ class Company {
     this.crVerificationStatus = data.crVerificationStatus || 'pending';
     this.crVerifiedAt = data.crVerifiedAt || null;
     this.crVerificationNotes = data.crVerificationNotes || null;
-    this.isVerified = data.isVerified || false;
+    this.isVerified = data.isVerified || true;
     
     // PROFILE MANAGEMENT
     this.profileCompletionStep = data.profileCompletionStep || 1;
@@ -383,8 +385,6 @@ class Company {
     
     // SYSTEM FIELDS
     this.isActive = data.isActive !== undefined ? data.isActive : true;
-    this.isSuspended = data.isSuspended || false;
-    this.suspensionReason = data.suspensionReason || null;
     this.lastLoginAt = data.lastLoginAt || null;
     
     // PERFORMANCE METRICS
@@ -958,11 +958,9 @@ class Company {
         updatedAt: new Date().toISOString()
       };
 
-      // If trial expired, suspend access unless they have active subscription
+      // If trial expired, update subscription status unless they have active subscription
       if (daysRemaining === 0 && this.subscriptionStatus === 'trial') {
         updateData.subscriptionStatus = 'expired';
-        updateData.isSuspended = true;
-        updateData.suspensionReason = 'Trial period expired';
       }
 
       return await this.update(updateData);
@@ -1110,6 +1108,253 @@ class Company {
       console.error('Error processing PAYG payment:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create Thawani checkout session for payment
+   */
+  async createThawaniCheckoutSession(paymentData) {
+    try {
+      const thawaniConfig = {
+        apiKey: process.env.THAWANI_SECRET_KEY || 'rRQ26GcsZzoEhbrP2HZvLYDbn9C9et',
+        baseUrl: process.env.THAWANI_BASE_URL || 'https://uatcheckout.thawani.om/api/v1'
+      };
+
+      const sessionData = {
+        client_reference_id: `${this.id}_${Date.now()}`,
+        mode: 'test',
+        products: [
+          {
+            name: paymentData.planName || 'Shift App Plan',
+            quantity: 1,
+            unit_amount: Math.round(paymentData.amount * 1000) // Thawani expects amount in baisa (1000 baisa = 1 OMR)
+          }
+        ],
+        success_url: `${process.env.FRONTEND_URL || 'https://shift.om'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'https://shift.om'}/payment/cancel`,
+        metadata: {
+          company_id: this.id,
+          company_name: this.companyName,
+          plan_type: paymentData.planType,
+          plan_name: paymentData.planName,
+          amount_omr: paymentData.amount,
+          user_id: this.userId
+        }
+      };
+
+      console.log('Thawani API Request:', {
+        url: `${thawaniConfig.baseUrl}/checkout/session`,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'thawani-secret-key': thawaniConfig.apiKey
+        },
+        body: sessionData
+      });
+
+      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'thawani-secret-key': thawaniConfig.apiKey
+        },
+        body: JSON.stringify(sessionData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Thawani API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+        
+        // Handle specific error cases
+        if (response.status === 403) {
+          if (errorText.includes('Cloudflare')) {
+            throw new Error('Thawani API access blocked. Please verify API key and IP whitelist with Thawani support.');
+          } else {
+            throw new Error('Thawani API authentication failed. Please verify API key and account status.');
+          }
+        }
+        
+        throw new Error(`Thawani API error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      console.log('Thawani API Response:', result);
+
+      if (result.success && result.data) {
+        // Save pending payment to database
+        const pendingPayment = {
+          sessionId: result.data.session_id,
+          clientReferenceId: result.data.client_reference_id,
+          planType: paymentData.planType,
+          planName: paymentData.planName,
+          amount: paymentData.amount,
+          currency: 'OMR',
+          status: 'pending',
+          thawaniSessionData: result.data,
+          createdAt: new Date().toISOString()
+        };
+
+        // Add to pending payments array
+        if (!this.pendingPayments) {
+          this.pendingPayments = [];
+        }
+        this.pendingPayments.push(pendingPayment);
+
+        await this.update({ pendingPayments: this.pendingPayments });
+
+        return {
+          success: true,
+          sessionId: result.data.session_id,
+          checkoutUrl: `${thawaniConfig.baseUrl.replace('/api/v1', '')}/pay/${result.data.session_id}`,
+          pendingPayment
+        };
+      } else {
+        throw new Error(result.description || 'Failed to create checkout session');
+      }
+    } catch (error) {
+      console.error('Error creating Thawani checkout session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process successful payment from Thawani webhook
+   */
+  async processSuccessfulPayment(sessionId, paymentData) {
+    try {
+      // Find the pending payment
+      const pendingPayment = this.pendingPayments?.find(p => p.sessionId === sessionId);
+      if (!pendingPayment) {
+        throw new Error('Pending payment not found');
+      }
+
+      // Create completed transaction
+      const transaction = {
+        id: `txn_${Date.now()}`,
+        type: pendingPayment.planType,
+        planName: pendingPayment.planName,
+        amount: pendingPayment.amount,
+        currency: 'OMR',
+        thawaniSessionId: sessionId,
+        status: 'completed',
+        paymentDate: new Date().toISOString(),
+        metadata: paymentData
+      };
+
+      // Update company based on plan type
+      let updateData = {
+        paymentHistory: [...this.paymentHistory, transaction],
+        updatedAt: new Date().toISOString()
+      };
+
+      switch (pendingPayment.planType) {
+        case 'pay_as_you_go':
+          // Add credits for pay as you go
+          updateData.usageStats = {
+            ...this.usageStats,
+            instantMatches: this.usageStats.instantMatches + Math.floor(pendingPayment.amount / 5)
+          };
+          break;
+
+        case 'subscription_starter':
+          // Activate starter subscription
+          updateData.subscriptionPlan = 'starter';
+          updateData.subscriptionStatus = 'active';
+          updateData.nextBillingDate = new Date(Date.now() + (6 * 30 * 24 * 60 * 60 * 1000)).toISOString(); // 6 months
+          updateData.planLimits = this.getPlanLimits();
+          break;
+
+        case 'subscription_pro':
+          // Activate pro subscription
+          updateData.subscriptionPlan = 'pro';
+          updateData.subscriptionStatus = 'active';
+          updateData.nextBillingDate = new Date(Date.now() + (12 * 30 * 24 * 60 * 60 * 1000)).toISOString(); // 12 months
+          updateData.planLimits = this.getPlanLimits();
+          break;
+      }
+
+      // Remove from pending payments
+      const updatedPendingPayments = this.pendingPayments.filter(p => p.sessionId !== sessionId);
+      updateData.pendingPayments = updatedPendingPayments;
+
+      await this.update(updateData);
+
+      // Send payment successful notification
+      try {
+        const paymentData = {
+          companyId: this.id,
+          companyEmail: this.companyEmail,
+          companyName: this.companyName,
+          amount: transaction.amount.toString(),
+          currency: transaction.currency,
+          planName: transaction.planName,
+          adminEmails: [this.companyEmail]
+        };
+        
+        await notificationController.sendPaymentSuccessful(paymentData);
+        console.log('✅ Payment successful notification sent');
+      } catch (notificationError) {
+        console.error('⚠️  Failed to send payment notification:', notificationError);
+      }
+
+      return {
+        success: true,
+        transaction,
+        updatedPlan: updateData.subscriptionPlan || 'pay_as_you_go'
+      };
+    } catch (error) {
+      console.error('Error processing successful payment:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if plan has expired and needs upgrade
+   */
+  checkPlanExpiration() {
+    const now = new Date();
+    
+    if (this.subscriptionPlan === 'trial') {
+      const trialEnd = new Date(this.trialEndDate);
+      return {
+        expired: trialEnd < now,
+        daysRemaining: Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))),
+        needsUpgrade: trialEnd < now
+      };
+    }
+
+    if (this.subscriptionPlan === 'pay_as_you_go') {
+      // Check if they have credits remaining
+      const hasCredits = this.usageStats.instantMatches > 0 || this.usageStats.interviews > 0;
+      return {
+        expired: !hasCredits,
+        daysRemaining: 0,
+        needsUpgrade: !hasCredits
+      };
+    }
+
+    if (this.nextBillingDate) {
+      const billingDate = new Date(this.nextBillingDate);
+      const daysUntilBilling = Math.ceil((billingDate - now) / (1000 * 60 * 60 * 24));
+      
+      return {
+        expired: billingDate < now,
+        daysRemaining: Math.max(0, daysUntilBilling),
+        needsUpgrade: billingDate < now
+      };
+    }
+
+    return {
+      expired: false,
+      daysRemaining: 0,
+      needsUpgrade: false
+    };
   }
 
   /**
@@ -1554,6 +1799,7 @@ class Company {
       paymentMethods: this.paymentMethods,
       defaultPaymentMethod: this.defaultPaymentMethod,
       paymentHistory: this.paymentHistory,
+      pendingPayments: this.pendingPayments,
       nextBillingDate: this.nextBillingDate,
       billingCycle: this.billingCycle,
       
@@ -1599,8 +1845,6 @@ class Company {
       
       // System Fields
       isActive: this.isActive,
-      isSuspended: this.isSuspended,
-      suspensionReason: this.suspensionReason,
       lastLoginAt: this.lastLoginAt,
       
       // Performance Metrics
@@ -1735,7 +1979,6 @@ class Company {
       
       // System status
       isActive: this.isActive,
-      isSuspended: this.isSuspended,
       
       // Company Analytics (Public safe)
       companyAnalytics: {
@@ -1836,8 +2079,6 @@ class Company {
       
       // System information
       isActive: this.isActive,
-      isSuspended: this.isSuspended,
-      suspensionReason: this.suspensionReason,
       lastLoginAt: this.lastLoginAt,
       
       // All metrics

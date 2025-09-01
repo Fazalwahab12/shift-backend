@@ -1191,23 +1191,114 @@ class SeekerController {
         });
       }
 
-      // For now, return a placeholder URL since Firebase Storage integration isn't shown
-      // In a real implementation, you would upload to Firebase Storage here
-      const imageUrl = `https://placeholder-storage.com/${Date.now()}-${req.file.originalname}`;
+      // Check if Firebase is configured
+      if (!global.firebase || !global.firebase.storage) {
+        return res.status(500).json({
+          success: false,
+          message: 'Firebase Storage not configured'
+        });
+      }
 
+      try {
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2, 15);
+        const fileExtension = req.file.originalname.split('.').pop();
+        const fileName = `profiles/seekers/${timestamp}-${randomId}.${fileExtension}`;
+
+        // Upload to Firebase Storage
+        const bucket = global.firebase.storage().bucket();
+        const file = bucket.file(fileName);
+        
+        // Create write stream
+        const stream = file.createWriteStream({
+          metadata: {
+            contentType: req.file.mimetype,
+            metadata: {
+              originalName: req.file.originalname,
+              uploadedAt: new Date().toISOString(),
+              userId: req.user?.userId || 'unknown'
+            }
+          }
+        });
+
+        // Handle stream events
+        stream.on('error', (error) => {
+          console.error('Firebase Storage upload error:', error);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to upload image to storage'
+          });
+        });
+
+        stream.on('finish', async () => {
+          try {
+            // Make file publicly accessible
+            await file.makePublic();
+            
+            // Get public URL
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+            
+            res.status(200).json({
+              success: true,
+              message: 'Image uploaded successfully',
+              data: {
+                imageUrl: publicUrl,
+                fileName: req.file.originalname,
+                fileSize: req.file.size,
+                mimeType: req.file.mimetype,
+                storagePath: fileName
+              }
+            });
+          } catch (error) {
+            console.error('Error making file public:', error);
+            res.status(500).json({
+              success: false,
+              message: 'Failed to make image publicly accessible'
+            });
+          }
+        });
+
+        // Write file buffer to stream
+        stream.end(req.file.buffer);
+
+      } catch (firebaseError) {
+        console.error('Firebase Storage error:', firebaseError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to upload image to Firebase Storage'
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in uploadImage:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Clean up placeholder URLs from database
+   * POST /api/seekers/cleanup-placeholders
+   */
+  static async cleanupPlaceholderUrls(req, res) {
+    try {
+      const cleanedCount = await Seeker.cleanupAllPlaceholderUrls();
+      
       res.status(200).json({
         success: true,
-        message: 'Image uploaded successfully',
+        message: `Successfully cleaned up ${cleanedCount} placeholder URLs`,
         data: {
-          imageUrl: imageUrl,
-          fileName: req.file.originalname,
-          fileSize: req.file.size,
-          mimeType: req.file.mimetype
+          cleanedCount,
+          cleanedAt: new Date().toISOString()
         }
       });
 
     } catch (error) {
-      console.error('Error in uploadImage:', error);
+      console.error('Error in cleanupPlaceholderUrls:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

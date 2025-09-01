@@ -35,6 +35,7 @@ class Job {
     // Interview First Fields
     this.interviewDate = data.interviewDate || null; // Optional interview date
     this.interviewTime = data.interviewTime || null; // Optional interview time
+    this.interviewDuration = data.interviewDuration || null; // Interview duration (15 min, 30 min, etc.)
     this.interviewLocation = data.interviewLocation || null; // Optional interview location
     this.interviewLanguages = data.interviewLanguages || ['English', 'Arabic']; // Interview languages
     this.workType = data.workType || 'hourly'; // 'hourly' | 'short' | 'full'
@@ -47,6 +48,7 @@ class Job {
     
     // STEP 4: Published (published.tsx) - Auto-generated fields
     this.jobStatus = data.jobStatus || 'draft'; // 'draft' | 'published' | 'paused' | 'closed'
+    this.applicationStatus = data.applicationStatus || this.getApplicationStatusFromJobStatus(this.jobStatus); // 'Posted' | 'Canceled' | 'Draft'
     this.publishedAt = data.publishedAt || null;
     this.jobId = data.jobId || this.generateJobId(); // Display job ID
     
@@ -85,11 +87,11 @@ class Job {
    */
   calculateSalaryRange() {
     if (!this.payPerHour || !this.hoursPerDay) return null;
-    
+
     const dailySalary = this.payPerHour * this.hoursPerDay;
     const weeklySalary = dailySalary * 5; // Assuming 5 working days
     const monthlySalary = weeklySalary * 4; // Assuming 4 weeks
-    
+
     return {
       hourly: this.payPerHour,
       daily: dailySalary,
@@ -97,6 +99,28 @@ class Job {
       monthly: monthlySalary,
       currency: 'OMR'
     };
+  }
+
+  /**
+   * Get application status from job status
+   */
+  getApplicationStatusFromJobStatus(jobStatus) {
+    switch (jobStatus) {
+      case 'published':
+        return 'Posted';
+      case 'closed':
+        return 'Canceled';
+      case 'draft':
+      default:
+        return 'Draft';
+    }
+  }
+
+  /**
+   * Update application status based on job status changes
+   */
+  updateApplicationStatus() {
+    this.applicationStatus = this.getApplicationStatusFromJobStatus(this.jobStatus);
   }
 
   /**
@@ -144,13 +168,76 @@ class Job {
   }
 
   /**
+   * Populate company and location data
+   */
+  async populateCompanyData() {
+    try {
+      const Company = require('./Company');
+      
+      // Get company data
+      const company = await Company.findById(this.companyId);
+      if (company) {
+        this.companyName = company.companyName;
+        
+        // Find location in company's locations array
+        if (this.brandLocationId && company.locations && company.locations.length > 0) {
+          const location = company.locations.find(loc => loc.id === this.brandLocationId);
+          if (location) {
+            this.locationAddress = location.address;
+            this.brandName = location.brand;
+            // You can also set governorate/wilayat if available in location data
+          }
+        }
+        
+        // Save the updated data
+        await this.update({
+          companyName: this.companyName,
+          locationAddress: this.locationAddress,
+          brandName: this.brandName
+        });
+      }
+    } catch (error) {
+      console.error('Error populating company data:', error);
+    }
+  }
+
+  /**
    * Check if job can be published
    */
   canPublish() {
     const requiredFields = [
       'companyId',
       'brandLocationId',
-      'roleId',
+      'jobSummary',
+      'hiringType'
+    ];
+    
+    // Check that we have either roleId OR roleName (at least one role identifier)
+    const hasRoleIdentifier = this.roleId || this.roleName;
+    
+    // Check instant hire specific requirements
+    if (this.hiringType === 'Instant Hire') {
+      requiredFields.push('payPerHour', 'hoursPerDay', 'startDate', 'paymentTerms');
+    }
+    
+    // Check interview first specific requirements
+    if (this.hiringType === 'Interview First') {
+      requiredFields.push('workType');
+    }
+    
+    // Check all required fields AND role identifier
+    const allFieldsValid = requiredFields.every(field => this[field] !== null && this[field] !== undefined);
+    
+    return allFieldsValid && hasRoleIdentifier;
+  }
+
+  /**
+   * Get missing fields for publishing
+   */
+  getMissingFields() {
+    const requiredFields = [
+      'companyId',
+      'brandLocationId', 
       'jobSummary',
       'hiringType'
     ];
@@ -165,7 +252,21 @@ class Job {
       requiredFields.push('workType');
     }
     
-    return requiredFields.every(field => this[field] !== null && this[field] !== undefined);
+    const missing = [];
+    
+    // Check role identifier
+    if (!this.roleId && !this.roleName) {
+      missing.push('roleId or roleName');
+    }
+    
+    // Check other required fields
+    requiredFields.forEach(field => {
+      if (this[field] === null || this[field] === undefined || this[field] === '') {
+        missing.push(field);
+      }
+    });
+    
+    return missing;
   }
 
   /**
@@ -175,13 +276,15 @@ class Job {
     if (!this.canPublish()) {
       throw new Error('Job missing required fields for publishing');
     }
-    
+
     this.jobStatus = 'published';
+    this.applicationStatus = 'Posted';
     this.publishedAt = new Date().toISOString();
     this.generateSearchTags();
-    
+
     return await this.update({
       jobStatus: this.jobStatus,
+      applicationStatus: this.applicationStatus,
       publishedAt: this.publishedAt,
       searchTags: this.searchTags
     });
@@ -220,6 +323,7 @@ class Job {
       genderPreference: this.genderPreference,
       jobPerks: this.jobPerks,
       jobStatus: this.jobStatus,
+      applicationStatus: this.applicationStatus,
       publishedAt: this.publishedAt,
       jobId: this.jobId,
       applicationsCount: this.applicationsCount,
@@ -265,6 +369,7 @@ class Job {
       requiredLanguages: this.requiredLanguages,
       genderPreference: this.genderPreference,
       jobPerks: this.jobPerks,
+      applicationStatus: this.applicationStatus,
       publishedAt: this.publishedAt,
       applicationsCount: this.applicationsCount,
       viewsCount: this.viewsCount
@@ -291,7 +396,7 @@ class Job {
   }
 
   /**
-   * Find job by ID
+   * Find job by internal database ID
    */
   static async findById(jobId) {
     try {
@@ -299,6 +404,25 @@ class Job {
       return jobData ? new Job(jobData) : null;
     } catch (error) {
       console.error('Error finding job:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find job by display jobId (e.g., "JOB-MF0NQLYR051DW")
+   */
+  static async findByJobId(jobId) {
+    try {
+      const jobs = await databaseService.query(
+        COLLECTIONS.JOBS,
+        [
+          { field: 'jobId', operator: '==', value: jobId },
+          { field: 'isActive', operator: '==', value: true }
+        ]
+      );
+      return jobs.length > 0 ? new Job(jobs[0]) : null;
+    } catch (error) {
+      console.error('Error finding job by jobId:', error);
       throw error;
     }
   }
@@ -372,15 +496,24 @@ class Job {
         ...updateData,
         updatedAt: new Date().toISOString()
       };
-      
+
+      // Update application status if job status is being changed
+      if (updateData.jobStatus && updateData.jobStatus !== this.jobStatus) {
+        updatedData.applicationStatus = this.getApplicationStatusFromJobStatus(updateData.jobStatus);
+      }
 
       await databaseService.update(COLLECTIONS.JOBS, this.id, updatedData);
-      
+
       // Update local instance
       Object.keys(updatedData).forEach(key => {
         this[key] = updatedData[key];
       });
-      
+
+      // Update application status on local instance
+      if (updatedData.applicationStatus) {
+        this.applicationStatus = updatedData.applicationStatus;
+      }
+
       return this;
     } catch (error) {
       console.error('Error updating job:', error);

@@ -696,6 +696,13 @@ router.post('/upload-image', authenticateToken, upload.single('image'), [
 ], SeekerController.uploadImage);
 
 /**
+ * @route   POST /api/seekers/cleanup-placeholders
+ * @desc    Clean up placeholder URLs from database (Admin only)
+ * @access  Private (JWT Token Required)
+ */
+router.post('/cleanup-placeholders', authenticateToken, SeekerController.cleanupPlaceholderUrls);
+
+/**
  * @route   GET /api/seekers/admin/export-csv
  * @desc    Export all seekers data (Admin only)
  * @access  Private (JWT Token Required - Admin)

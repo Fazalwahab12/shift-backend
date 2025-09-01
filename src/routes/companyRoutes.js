@@ -359,6 +359,59 @@ router.post('/:companyId/payg-payment', authenticateToken, [
 ], CompanyController.processPAYGPayment);
 
 /**
+ * @route   POST /api/companies/:companyId/thawani-checkout
+ * @desc    Create Thawani checkout session for payment
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:companyId/thawani-checkout', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('planType')
+    .isIn(['pay_as_you_go', 'subscription_starter', 'subscription_pro'])
+    .withMessage('Plan type must be pay_as_you_go, subscription_starter, or subscription_pro'),
+  body('planName')
+    .notEmpty()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Plan name is required'),
+  body('amount')
+    .isFloat({ min: 0.1 })
+    .withMessage('Amount must be greater than 0'),
+  body('planDetails')
+    .optional()
+    .isObject()
+    .withMessage('Plan details must be an object')
+], CompanyController.createThawaniCheckout);
+
+/**
+ * @route   POST /api/companies/:companyId/thawani-webhook
+ * @desc    Handle Thawani payment webhook
+ * @access  Public (Thawani webhook)
+ */
+router.post('/:companyId/thawani-webhook', [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  body('session_id')
+    .notEmpty()
+    .withMessage('Session ID is required'),
+  body('payment_status')
+    .notEmpty()
+    .withMessage('Payment status is required')
+], CompanyController.handleThawaniWebhook);
+
+/**
+ * @route   GET /api/companies/:companyId/plan-status
+ * @desc    Get current plan status and expiration info
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/plan-status', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.getPlanStatus);
+
+/**
  * @route   POST /api/companies/:companyId/request-custom-plan
  * @desc    Request custom plan
  * @access  Private (JWT Token Required)

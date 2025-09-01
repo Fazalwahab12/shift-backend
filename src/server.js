@@ -30,6 +30,9 @@ const companyRoutes = require('./routes/companyRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const userJourneyRoutes = require('./routes/userJourneyRoutes');
 const callbackRoutes = require('./routes/callback');
+const chatRoutes = require('./routes/chatRoutes');
+const jobApplicationRoutes = require('./routes/jobApplicationRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 /**
  * Shift Backend API Server
@@ -181,7 +184,10 @@ class ShiftServer {
       this.app.use('/api/companies', companyRoutes);
       this.app.use('/api/jobs', jobRoutes);
       this.app.use('/api/journey', userJourneyRoutes);
-      console.log('✅ Database routes enabled');
+      this.app.use('/api/chats', chatRoutes);
+      this.app.use('/api/', jobApplicationRoutes);
+      this.app.use('/api/notifications', notificationRoutes);
+      console.log('✅ Database routes enabled (including chat, applications & notifications)');
     } else {
       // Mock routes for when database is disabled
       this.app.use('/api/phone', (req, res) => {
@@ -242,7 +248,8 @@ class ShiftServer {
           companies: '/api/companies',
           jobs: '/api/jobs',
           journey: '/api/journey',
-          callback: '/api/callback'
+          callback: '/api/callback',
+          notifications: '/api/notifications'
         },
         timestamp: new Date().toISOString()
       });

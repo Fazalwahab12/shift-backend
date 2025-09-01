@@ -2,6 +2,7 @@ const Company = require('../models/Company');
 const User = require('../models/User');
 const OnboardingData = require('../models/OnboardingData');
 const { validationResult } = require('express-validator');
+const notificationController = require('./notificationController');
 
 /**
  * Company Profile Controller
@@ -75,6 +76,23 @@ class CompanyController {
       } else {
         // Create profile without onboarding data
         newCompany = await Company.create(userId, profileData);
+      }
+
+      // Send notification after successful company creation
+      try {
+        const companyData = {
+          id: newCompany.id,
+          name: newCompany.companyName,
+          companyName: newCompany.companyName,
+          email: newCompany.companyEmail || user.email
+        };
+        
+        // Send company account created notification
+        await notificationController.sendCompanyAccountCreated(companyData);
+        console.log('✅ Company creation notification sent successfully');
+      } catch (notificationError) {
+        console.error('⚠️  Failed to send company creation notification:', notificationError);
+        // Don't fail the whole request for notification error
       }
 
       res.status(201).json({
@@ -2630,6 +2648,181 @@ class CompanyController {
 
     } catch (error) {
       console.error('Error getting trending jobs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // ===================================
+  // THAWANI PAYMENT INTEGRATION METHODS
+  // ===================================
+
+  /**
+   * Create Thawani checkout session
+   * POST /api/companies/:companyId/thawani-checkout
+   */
+  static async createThawaniCheckout(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { planType, planName, amount, planDetails } = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Verify user owns this company
+      if (company.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to make payments for this company'
+        });
+      }
+
+      const paymentData = {
+        planType,
+        planName,
+        amount: parseFloat(amount),
+        planDetails: planDetails || {}
+      };
+
+      const checkoutResult = await company.createThawaniCheckoutSession(paymentData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Checkout session created successfully',
+        data: {
+          sessionId: checkoutResult.sessionId,
+          checkoutUrl: checkoutResult.checkoutUrl,
+          pendingPayment: checkoutResult.pendingPayment
+        }
+      });
+
+    } catch (error) {
+      console.error('Error creating Thawani checkout:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Handle Thawani payment webhook
+   * POST /api/companies/:companyId/thawani-webhook
+   */
+  static async handleThawaniWebhook(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const { session_id, payment_status } = req.body;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      if (payment_status === 'paid') {
+        // Process successful payment
+        const result = await company.processSuccessfulPayment(session_id, req.body);
+        
+        res.status(200).json({
+          success: true,
+          message: 'Payment processed successfully',
+          data: result
+        });
+      } else {
+        // Handle failed/cancelled payment
+        res.status(200).json({
+          success: false,
+          message: `Payment status: ${payment_status}`,
+          error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+      }
+
+    } catch (error) {
+      console.error('Error handling Thawani webhook:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get current plan status and expiration info
+   * GET /api/companies/:companyId/plan-status
+   */
+  static async getPlanStatus(req, res) {
+    try {
+      const { companyId } = req.params;
+
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      // Verify user owns this company
+      if (company.userId !== req.user.userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view this company'
+        });
+      }
+
+      const planStatus = company.checkPlanExpiration();
+      const currentPlan = company.subscriptionPlan;
+      const planLimits = company.getPlanLimits();
+      const usage = company.usageStats;
+
+      res.status(200).json({
+        success: true,
+        message: 'Plan status retrieved successfully',
+        data: {
+          currentPlan,
+          planStatus,
+          planLimits,
+          usage,
+          needsUpgrade: planStatus.needsUpgrade,
+          daysRemaining: planStatus.daysRemaining,
+          subscriptionStatus: company.getSubscriptionStatus(),
+          trialStatus: company.getTrialStatus()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting plan status:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

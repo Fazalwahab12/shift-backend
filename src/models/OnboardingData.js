@@ -15,7 +15,6 @@ class OnboardingData {
     this.selectedSkills = data.selectedSkills || [];
     
     // Additional preferences
-    this.workLocationPreference = data.workLocationPreference || [];
     this.preferredSocialMedia = data.preferredSocialMedia || [];
     
     // Removed completion tracking - onboarding goes directly to profile creation
@@ -270,7 +269,6 @@ class OnboardingData {
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
       selectedSkills: this.selectedSkills,
-      workLocationPreference: this.workLocationPreference,
       preferredSocialMedia: this.preferredSocialMedia
     };
   }
@@ -286,7 +284,6 @@ class OnboardingData {
       selectedIndustries: this.selectedIndustries,
       selectedRoles: this.selectedRoles,
       selectedSkills: this.selectedSkills,
-      workLocationPreference: this.workLocationPreference,
       preferredSocialMedia: this.preferredSocialMedia
     };
   }

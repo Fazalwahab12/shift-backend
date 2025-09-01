@@ -47,12 +47,20 @@ router.post('/', authenticateToken, [
     .withMessage('Dress code must not exceed 500 characters'),
   body('jobCoverImage')
     .optional()
-    .isURL()
-    .withMessage('Job cover image must be a valid URL'),
+    .custom((value) => {
+      if (!value) return true;
+      // Allow URLs or file URIs
+      return value.startsWith('http') || value.startsWith('file://') || value.startsWith('content://');
+    })
+    .withMessage('Job cover image must be a valid URL or file URI'),
   body('dressCodeGuideline')
     .optional()
-    .isURL()
-    .withMessage('Dress code guideline must be a valid URL')
+    .custom((value) => {
+      if (!value) return true;
+      // Allow URLs or file URIs
+      return value.startsWith('http') || value.startsWith('file://') || value.startsWith('content://');
+    })
+    .withMessage('Dress code guideline must be a valid URL or file URI')
 ], JobController.createJob);
 
 /**

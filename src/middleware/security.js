@@ -108,11 +108,11 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:8081',
-              'http://192.168.42.114:3000',
-        'http://192.168.42.114:8081',
+              'http://192.168.42.42:3000',
+        'http://192.168.42.42:8081',
       'https://your-frontend-domain.com',
-      'exp://192.168.42.114:8081', // Expo development
-              'exp://192.168.42.114:8081', // Your actual IP
+      'exp://192.168.42.42:8081', // Expo development
+              'exp://192.168.42.42:8081', // Your actual IP
     ];
     
     // Add environment-specific origins
