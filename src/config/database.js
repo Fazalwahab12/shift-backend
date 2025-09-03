@@ -10,13 +10,16 @@ const COLLECTIONS = {
   JOBS: 'jobs',
   APPLICATIONS: 'applications',
   JOB_APPLICATIONS: 'job_applications',
+  INTERVIEWS: 'interviews',
   CHATS: 'chats',
   MESSAGES: 'messages',
   PHONE_REGISTRATIONS: 'phone_registrations',
   ONBOARDING_DATA: 'onboarding_data',
   INDUSTRIES: 'industries',
   ROLES: 'roles',
-  NOTIFICATIONS: 'notifications'
+  NOTIFICATIONS: 'notifications',
+  EMAIL_HISTORY: 'email_history',
+  SAVED_JOBS: 'savedJobs'
 };
 
 /**
@@ -36,6 +39,9 @@ class DatabaseService {
       const firebase = await firebaseConfig.initialize();
       this.db = firebase.db;
       this.isInitialized = true;
+      
+      // Set Firebase globally so other services can access Storage
+      global.firebase = firebase;
       
       console.log('📊 Database service initialized successfully');
       return this.db;

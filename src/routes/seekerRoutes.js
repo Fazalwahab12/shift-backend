@@ -714,4 +714,27 @@ router.get('/admin/export-csv', authenticateToken, [
     .withMessage('Limit must be between 1 and 5000')
 ], SeekerController.exportSeekerData);
 
+/**
+ * @route   GET /api/seekers/blocking-status
+ * @desc    Get seeker's blocking status across companies
+ * @access  Private (Seeker)
+ */
+router.get('/blocking-status', authenticateToken, SeekerController.getBlockingStatus);
+
+/**
+ * @route   GET /api/seekers/blocking-stats
+ * @desc    Get detailed blocking statistics for seeker
+ * @access  Private (Seeker)
+ */
+router.get('/blocking-stats', authenticateToken, SeekerController.getBlockingStats);
+
+/**
+ * @route   GET /api/seekers/can-apply-to/:companyId
+ * @desc    Check if seeker can apply to a specific company
+ * @access  Private (Seeker)
+ */
+router.get('/can-apply-to/:companyId', authenticateToken, [
+  param('companyId').notEmpty().withMessage('Company ID is required')
+], SeekerController.canApplyToCompany);
+
 module.exports = router;

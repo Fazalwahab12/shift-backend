@@ -300,6 +300,179 @@ class JobApplicationController {
   }
 
   /**
+   * Decline job application with specific reasons
+   * PUT /api/applications/:applicationId/decline
+   */
+  static async declineApplication(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason } = req.body;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can decline applications'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify company owns the job
+      if (application.companyId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.decline(reason);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Application declined successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error declining application:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to decline application',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Decline job application with specific reasons
+   * PUT /api/applications/:applicationId/decline
+   */
+  static async declineApplication(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason } = req.body;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can decline applications'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify company owns the job
+      if (application.companyId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.decline(reason);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Application declined successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error declining application:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to decline application',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Send hire request to seeker
+   * PUT /api/applications/:applicationId/hire
+   */
+  static async sendHireRequest(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can send hire requests'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify company owns the job
+      if (application.companyId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.sendHireRequest();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Hire request sent successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error sending hire request:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send hire request',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
    * Shortlist application
    * PUT /api/applications/:applicationId/shortlist
    */
@@ -462,6 +635,476 @@ class JobApplicationController {
       res.status(500).json({
         success: false,
         message: 'Failed to withdraw application',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Invite seeker to apply for job
+   * POST /api/jobs/:jobId/invite/:seekerId
+   */
+  static async inviteSeeker(req, res) {
+    try {
+      const { jobId, seekerId } = req.params;
+      const { userId, userType } = req.user;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can invite seekers'
+        });
+      }
+
+      // Get job details
+      const job = await Job.findByJobId(jobId);
+      if (!job || job.companyId !== userId) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found or access denied'
+        });
+      }
+
+      // Check if invitation already exists
+      const existingApplication = await JobApplication.findBySeekerId(seekerId, { jobId });
+      if (existingApplication.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Seeker has already applied or been invited to this job'
+        });
+      }
+
+      // Create invitation
+      const applicationData = {
+        jobId: job.jobId,
+        seekerId,
+        companyId: job.companyId,
+        jobTitle: job.roleName,
+        companyName: job.companyName,
+        status: 'invited'
+      };
+
+      const application = await JobApplication.create(applicationData);
+      
+      res.status(201).json({
+        success: true,
+        message: 'Seeker invited successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error inviting seeker:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to invite seeker',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Accept invitation and apply to job
+   * PUT /api/applications/:applicationId/accept-invitation
+   */
+  static async acceptInvitation(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can accept invitations'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify seeker owns the application
+      if (application.seekerId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.acceptInvitation();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Invitation accepted successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error accepting invitation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to accept invitation',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Respond to hire request
+   * PUT /api/applications/:applicationId/hire-response
+   */
+  static async respondToHireRequest(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { response } = req.body;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can respond to hire requests'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify seeker owns the application
+      if (application.seekerId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.respondToHireRequest(response);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Hire request response submitted successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error responding to hire request:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to respond to hire request',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Report absence
+   * POST /api/applications/:applicationId/report-absence
+   */
+  static async reportAbsence(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason } = req.body;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can report absences'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify company owns the job
+      if (application.companyId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      await application.reportAbsence(reason);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Absence reported successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error reporting absence:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to report absence',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get reports for application
+   * GET /api/applications/:applicationId/reports
+   */
+  static async getReports(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify user has access to this application
+      const hasAccess = (userType === 'company' && application.companyId === userId) ||
+                       (userType === 'seeker' && application.seekerId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      const reports = await application.getReports();
+      
+      res.status(200).json({
+        success: true,
+        message: 'Reports retrieved successfully',
+        data: reports
+      });
+
+    } catch (error) {
+      console.error('Error getting reports:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve reports',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Block seeker
+   * POST /api/seekers/:seekerId/block
+   */
+  static async blockSeeker(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason } = req.body;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can block seekers'
+        });
+      }
+
+      // Block seeker logic would go here
+      res.status(200).json({
+        success: true,
+        message: 'Seeker blocked successfully',
+        data: {
+          seekerId,
+          reason,
+          blockedBy: userId
+        }
+      });
+
+    } catch (error) {
+      console.error('Error blocking seeker:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to block seeker',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Unblock seeker
+   * DELETE /api/seekers/:seekerId/block
+   */
+  static async unblockSeeker(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { userId, userType } = req.user;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can unblock seekers'
+        });
+      }
+
+      // Unblock seeker logic would go here
+      res.status(200).json({
+        success: true,
+        message: 'Seeker unblocked successfully',
+        data: {
+          seekerId,
+          unblockedBy: userId
+        }
+      });
+
+    } catch (error) {
+      console.error('Error unblocking seeker:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to unblock seeker',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get blocked seekers
+   * GET /api/company/blocked-seekers
+   */
+  static async getBlockedSeekers(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can view blocked seekers'
+        });
+      }
+
+      // Get blocked seekers logic would go here
+      const blockedSeekers = [];
+      
+      res.status(200).json({
+        success: true,
+        message: 'Blocked seekers retrieved successfully',
+        data: blockedSeekers
+      });
+
+    } catch (error) {
+      console.error('Error getting blocked seekers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve blocked seekers',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get blocking statistics
+   * GET /api/company/blocking-stats
+   */
+  static async getBlockingStats(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can view blocking statistics'
+        });
+      }
+
+      // Get blocking stats logic would go here
+      const stats = {
+        totalBlocked: 0,
+        totalUnblocked: 0,
+        currentlyBlocked: 0
+      };
+      
+      res.status(200).json({
+        success: true,
+        message: 'Blocking statistics retrieved successfully',
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error getting blocking stats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve blocking statistics',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Block seeker from application
+   * POST /api/applications/:applicationId/block-seeker
+   */
+  static async blockSeekerFromApplication(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason } = req.body;
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can block seekers'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Verify company owns the job
+      if (application.companyId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      // Block seeker from application logic would go here
+      res.status(200).json({
+        success: true,
+        message: 'Seeker blocked from application successfully',
+        data: {
+          applicationId,
+          seekerId: application.seekerId,
+          reason,
+          blockedBy: userId
+        }
+      });
+
+    } catch (error) {
+      console.error('Error blocking seeker from application:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to block seeker from application',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

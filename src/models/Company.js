@@ -310,6 +310,10 @@ class Company {
     this.walletHistory = data.walletHistory || []; // Credit transactions
     this.pendingCredits = data.pendingCredits || 0; // Credits after CR validation
     
+    // BLOCKING SYSTEM
+    this.blockedSeekers = data.blockedSeekers || []; // Array of blocked seeker IDs with reasons
+    this.blockingEnabled = data.blockingEnabled !== false; // Allow companies to block seekers
+    
     // USAGE & LIMITS (Enhanced Analytics)
     this.usageStats = data.usageStats || {
       instantMatches: 0,
@@ -1420,6 +1424,161 @@ class Company {
   }
 
   /**
+   * Block a job seeker
+   */
+  async blockSeeker(seekerId, reason = 'No reason provided', blockedBy = null) {
+    try {
+      // Check if seeker is already blocked
+      const existingBlock = this.blockedSeekers.find(block => 
+        block.seekerId === seekerId && block.isActive
+      );
+      if (existingBlock) {
+        throw new Error('Seeker is already blocked');
+      }
+
+      const blockEntry = {
+        seekerId: seekerId,
+        reason: reason,
+        blockedAt: new Date().toISOString(),
+        blockedBy: blockedBy, // Admin/HR person who blocked
+        isActive: true
+      };
+
+      this.blockedSeekers.push(blockEntry);
+
+      await this.update({
+        blockedSeekers: this.blockedSeekers,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Update seeker's record
+      try {
+        const Seeker = require('./Seeker');
+        const seeker = await Seeker.findById(seekerId);
+        if (seeker) {
+          await seeker.recordBlockedByCompany(
+            this.id, 
+            this.companyName, 
+            reason, 
+            blockEntry.blockedAt
+          );
+        }
+      } catch (seekerError) {
+        console.error('Error updating seeker blocked record:', seekerError);
+        // Don't throw - company block was successful
+      }
+
+      console.log(`🚫 Seeker ${seekerId} blocked by company ${this.id} - Reason: ${reason}`);
+      return this;
+    } catch (error) {
+      console.error('Error blocking seeker:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unblock a job seeker
+   */
+  async unblockSeeker(seekerId, unblockReason = 'Block removed', unblockedBy = null) {
+    try {
+      const blockIndex = this.blockedSeekers.findIndex(block => 
+        block.seekerId === seekerId && block.isActive
+      );
+
+      if (blockIndex === -1) {
+        throw new Error('Seeker is not blocked or block not found');
+      }
+
+      const unblockedAt = new Date().toISOString();
+
+      // Mark as inactive rather than removing (for audit trail)
+      this.blockedSeekers[blockIndex].isActive = false;
+      this.blockedSeekers[blockIndex].unblockedAt = unblockedAt;
+      this.blockedSeekers[blockIndex].unblockReason = unblockReason;
+      this.blockedSeekers[blockIndex].unblockedBy = unblockedBy;
+
+      await this.update({
+        blockedSeekers: this.blockedSeekers,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Update seeker's record
+      try {
+        const Seeker = require('./Seeker');
+        const seeker = await Seeker.findById(seekerId);
+        if (seeker) {
+          await seeker.recordUnblockedByCompany(
+            this.id, 
+            unblockReason, 
+            unblockedAt
+          );
+        }
+      } catch (seekerError) {
+        console.error('Error updating seeker unblock record:', seekerError);
+        // Don't throw - company unblock was successful
+      }
+
+      console.log(`✅ Seeker ${seekerId} unblocked by company ${this.id}`);
+      return this;
+    } catch (error) {
+      console.error('Error unblocking seeker:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a seeker is blocked
+   */
+  isSeekerBlocked(seekerId) {
+    return this.blockedSeekers.some(block => 
+      block.seekerId === seekerId && block.isActive
+    );
+  }
+
+  /**
+   * Get blocked seekers list
+   */
+  getBlockedSeekers(activeOnly = true) {
+    if (activeOnly) {
+      return this.blockedSeekers.filter(block => block.isActive);
+    }
+    return this.blockedSeekers;
+  }
+
+  /**
+   * Get block details for a specific seeker
+   */
+  getBlockDetails(seekerId) {
+    return this.blockedSeekers.find(block => 
+      block.seekerId === seekerId && block.isActive
+    );
+  }
+
+  /**
+   * Get blocking statistics
+   */
+  getBlockingStats() {
+    const activeBlocks = this.blockedSeekers.filter(block => block.isActive);
+    const totalBlocks = this.blockedSeekers.length;
+    const removedBlocks = this.blockedSeekers.filter(block => !block.isActive);
+
+    // Group by reason
+    const reasonStats = {};
+    activeBlocks.forEach(block => {
+      const reason = block.reason || 'No reason provided';
+      reasonStats[reason] = (reasonStats[reason] || 0) + 1;
+    });
+
+    return {
+      totalActiveBlocks: activeBlocks.length,
+      totalHistoricalBlocks: totalBlocks,
+      removedBlocks: removedBlocks.length,
+      reasonBreakdown: reasonStats,
+      blockingEnabled: this.blockingEnabled
+    };
+  }
+
+  /**
    * Add team member
    */
   async addTeamMember(email) {
@@ -1809,6 +1968,10 @@ class Company {
       creditBalance: this.creditBalance,
       walletHistory: this.walletHistory,
       pendingCredits: this.pendingCredits,
+      
+      // Blocking System
+      blockedSeekers: this.blockedSeekers,
+      blockingEnabled: this.blockingEnabled,
       
       // Usage & Limits with Analytics
       usageStats: this.usageStats,

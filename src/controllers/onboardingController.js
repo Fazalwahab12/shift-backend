@@ -487,6 +487,57 @@ class OnboardingController {
     }
   }
 
+  /**
+   * Get user onboarding preferences for job recommendations
+   * GET /api/onboarding/:userId/preferences
+   */
+  static async getUserPreferences(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { userId } = req.params;
+
+      // Get onboarding data for the user
+      const onboardingData = await OnboardingData.findByUserId(userId);
+      
+      if (!onboardingData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Onboarding preferences not found for this user'
+        });
+      }
+
+      // Return user preferences relevant for job recommendations
+      const preferences = {
+        selectedRoles: onboardingData.selectedRoles || [],
+        selectedIndustries: onboardingData.selectedIndustries || [],
+        selectedSkills: onboardingData.selectedSkills || [],
+        userType: onboardingData.userType
+      };
+
+      res.status(200).json({
+        success: true,
+        message: 'User preferences retrieved successfully',
+        data: preferences
+      });
+
+    } catch (error) {
+      console.error('Error getting user preferences:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
 }
 
 module.exports = OnboardingController;

@@ -4,38 +4,32 @@
  * Production-ready service with comprehensive error handling and logging
  */
 
-const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 const firebaseConfig = require('../config/firebase');
 const { COLLECTIONS, NOTIFICATION_TYPES } = require('../config/constants');
+const EmailHistory = require('../models/EmailHistory');
 const logger = require('../utils/logger');
 
 class NotificationService {
   constructor() {
-    // Validate API key exists
-    if (!process.env.RESEND) {
-      logger.warn('⚠️  RESEND environment variable not set. Email functionality will be disabled.');
+    // Validate Gmail credentials
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASSWORD) {
+      logger.warn('⚠️  GMAIL_USER or GMAIL_PASSWORD environment variables not set. Email functionality will be disabled.');
     }
     
-    // Initialize email sending method based on configuration
-    this.useSmtp = process.env.USE_SMTP === 'true';
-    
-    if (this.useSmtp && process.env.SMTP_HOST) {
-      // Setup SMTP transporter
+    // Setup Gmail transporter with Nodemailer
+    if (process.env.GMAIL_USER && process.env.GMAIL_PASSWORD) {
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT) || 465,
-        secure: process.env.SMTP_SECURE === 'true',
+        service: "gmail",
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
+          user: process.env.GMAIL_USER,
+          pass: process.env.GMAIL_PASSWORD,
+        },
       });
-      logger.info('📧 Using SMTP for email sending');
+      logger.info('📧 Using Gmail with Nodemailer for email sending');
     } else {
-      // Setup Resend REST API
-      this.resend = process.env.RESEND ? new Resend(process.env.RESEND) : null;
-      logger.info('📧 Using Resend REST API for email sending');
+      this.transporter = null;
+      logger.warn('📧 Email transporter not configured - emails will be logged only');
     }
     
     this.db = null;
@@ -176,57 +170,98 @@ class NotificationService {
   }
 
   /**
-   * Send email using Resend with different templates
+   * Send email using Gmail with Nodemailer and history tracking
    * @param {Object} receiver - Receiver data
    * @param {Object} content - Email content
    * @param {string} type - Notification type
    * @param {Object} metadata - Additional metadata
    */
   async _sendEmail(receiver, content, type, metadata = {}) {
+    let emailHistory = null;
+    
     try {
       const emailTemplate = this._getEmailTemplate(type, content, metadata);
       
       const emailData = {
-        from: '"Shift" <wahabdir567@gmail.com>', // Use your verified Resend domain/email
-        to: this.useSmtp ? receiver.email : [receiver.email], // SMTP uses string, REST API uses array
+        from: `"Shift" <${process.env.GMAIL_USER}>`, // Use Gmail user as sender
+        to: receiver.email,
         subject: emailTemplate.subject,
         html: emailTemplate.html,
         text: emailTemplate.text || emailTemplate.html.replace(/<[^>]*>/g, ''),
-        replyTo: 'wahabdir567@gmail.com' // Reply goes to your email
       };
+
+      // Create email history record before sending
+      emailHistory = await EmailHistory.create({
+        to: receiver.email,
+        from: emailData.from,
+        subject: emailData.subject,
+        htmlContent: emailData.html,
+        textContent: emailData.text,
+        templateName: emailTemplate.templateName || type,
+        notificationType: type,
+        userId: metadata.userId || null,
+        companyId: metadata.companyId || null,
+        seekerId: metadata.seekerId || null,
+        jobId: metadata.jobId || null,
+        applicationId: metadata.applicationId || null,
+        interviewId: metadata.interviewId || null,
+        service: 'gmail',
+        priority: metadata.priority || 'normal',
+        category: metadata.category || 'transactional',
+        tags: metadata.tags || [],
+        metadata: metadata
+      });
 
       let result;
       
-      if (this.useSmtp) {
-        // Send via SMTP
-        if (!this.transporter) {
-          throw new Error('SMTP transporter not initialized - check SMTP configuration');
-        }
-        result = await this.transporter.sendMail(emailData);
-        logger.info(`✅ Email sent via SMTP to ${receiver.email}:`, result.messageId);
+      if (!this.transporter) {
+        // Log email instead of sending if transporter not configured
+        logger.warn(`📧 Email would be sent to ${receiver.email} (transporter not configured):`);
+        logger.warn(`Subject: ${emailData.subject}`);
+        logger.warn(`Content: ${emailData.text?.substring(0, 200)}...`);
+        
+        // Mark as sent in history for testing/development
+        await emailHistory.markAsSent('dev-mode-' + Date.now(), 'Development mode - email logged');
+        
         return {
-          id: result.messageId,
+          id: 'dev-' + emailHistory.emailId,
           status: 'sent',
           timestamp: new Date().toISOString(),
-          method: 'SMTP'
-        };
-      } else {
-        // Send via Resend REST API
-        if (!this.resend) {
-          throw new Error('Resend service not initialized - check RESEND environment variable');
-        }
-        result = await this.resend.emails.send(emailData);
-        logger.info(`✅ Email sent via REST API to ${receiver.email}:`, result.id);
-        return {
-          id: result.id,
-          status: 'sent',
-          timestamp: new Date().toISOString(),
-          method: 'REST_API'
+          method: 'DEV_LOG',
+          emailHistoryId: emailHistory.id
         };
       }
 
+      // Send via Gmail with Nodemailer
+      result = await this.transporter.sendMail(emailData);
+      
+      // Mark as sent in email history
+      await emailHistory.markAsSent(result.messageId, {
+        response: result.response,
+        envelope: result.envelope
+      });
+      
+      logger.info(`✅ Email sent via Gmail to ${receiver.email}:`, result.messageId);
+      
+      return {
+        id: result.messageId,
+        status: 'sent',
+        timestamp: new Date().toISOString(),
+        method: 'GMAIL',
+        emailHistoryId: emailHistory.id
+      };
+
     } catch (error) {
-      logger.error(`❌ Failed to send email to ${receiver.email} via ${this.useSmtp ? 'SMTP' : 'REST API'}:`, error);
+      // Mark as failed in email history
+      if (emailHistory) {
+        try {
+          await emailHistory.markAsFailed(error);
+        } catch (historyError) {
+          logger.error('❌ Failed to update email history:', historyError);
+        }
+      }
+      
+      logger.error(`❌ Failed to send email to ${receiver.email} via Gmail:`, error);
       throw error;
     }
   }

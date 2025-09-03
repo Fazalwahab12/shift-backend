@@ -69,7 +69,6 @@ class Job {
     
     // Search & Matching Fields
     this.searchTags = data.searchTags || []; // Generated from role, skills, location
-    this.salaryRange = data.salaryRange || this.calculateSalaryRange();
     this.experienceLevel = data.experienceLevel || 'entry'; // Derived from requirements
   }
 
@@ -82,24 +81,6 @@ class Job {
     return `JOB-${timestamp}${random}`.toUpperCase();
   }
 
-  /**
-   * Calculate salary range based on pay per hour and hours
-   */
-  calculateSalaryRange() {
-    if (!this.payPerHour || !this.hoursPerDay) return null;
-
-    const dailySalary = this.payPerHour * this.hoursPerDay;
-    const weeklySalary = dailySalary * 5; // Assuming 5 working days
-    const monthlySalary = weeklySalary * 4; // Assuming 4 weeks
-
-    return {
-      hourly: this.payPerHour,
-      daily: dailySalary,
-      weekly: weeklySalary,
-      monthly: monthlySalary,
-      currency: 'OMR'
-    };
-  }
 
   /**
    * Get application status from job status
@@ -338,7 +319,6 @@ class Job {
       governorate: this.governorate,
       wilayat: this.wilayat,
       searchTags: this.searchTags,
-      salaryRange: this.salaryRange,
       experienceLevel: this.experienceLevel
     };
   }
@@ -364,7 +344,6 @@ class Job {
       startTime: this.startTime,
       hoursPerDay: this.hoursPerDay,
       payPerHour: this.payPerHour,
-      salaryRange: this.salaryRange,
       requiredSkills: this.requiredSkills,
       requiredLanguages: this.requiredLanguages,
       genderPreference: this.genderPreference,
@@ -589,6 +568,413 @@ class Job {
     } catch (error) {
       console.error('Error getting job stats:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get job recommendations based on user roles
+   * @param {Array} roles - Array of role names to match
+   * @param {number} limit - Maximum number of jobs to return
+   * @param {number} offset - Number of jobs to skip (not supported by current query method)
+   * @returns {Promise<Job[]>} - Array of recommended jobs
+   */
+  static async getRecommendationsByRoles(roles = [], limit = 20, offset = 0) {
+    try {
+      const searchFilters = [
+        { field: 'jobStatus', operator: '==', value: 'published' },
+        { field: 'isActive', operator: '==', value: true }
+      ];
+
+      // Get all published jobs first
+      const jobs = await databaseService.query(
+        COLLECTIONS.JOBS, 
+        searchFilters,
+        { field: 'createdAt', direction: 'desc' },
+        limit * 2 // Get more to filter locally
+      );
+
+      let filteredJobs = jobs.data || jobs;
+      
+      // Filter by roles if provided
+      if (roles && roles.length > 0) {
+        filteredJobs = filteredJobs.filter(jobData => {
+          return roles.some(role => 
+            jobData.roleName && jobData.roleName.toLowerCase().includes(role.toLowerCase())
+          );
+        });
+      }
+
+      // Apply manual pagination
+      const startIndex = offset || 0;
+      const endIndex = startIndex + (limit || 20);
+      const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
+
+      return paginatedJobs.map(jobData => new Job(jobData));
+    } catch (error) {
+      console.error('Error getting job recommendations by roles:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get recent jobs from last N days
+   * @param {number} days - Number of days to look back
+   * @param {number} limit - Maximum number of jobs to return
+   * @param {number} offset - Number of jobs to skip
+   * @returns {Promise<Job[]>} - Array of recent jobs
+   */
+  static async getRecentJobs(days = 10, limit = 20, offset = 0) {
+    try {
+      // Calculate the date N days ago
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - days);
+
+      const searchFilters = [
+        { field: 'jobStatus', operator: '==', value: 'published' },
+        { field: 'isActive', operator: '==', value: true }
+      ];
+
+      // Get all published jobs first
+      const jobs = await databaseService.query(
+        COLLECTIONS.JOBS, 
+        searchFilters,
+        { field: 'publishedAt', direction: 'desc' },
+        limit * 2 // Get more to filter locally
+      );
+
+      let filteredJobs = jobs.data || jobs;
+      
+      // Filter by publication date (last N days)
+      filteredJobs = filteredJobs.filter(jobData => {
+        if (!jobData.publishedAt) return false;
+        
+        const publishedDate = new Date(jobData.publishedAt);
+        return publishedDate >= daysAgo;
+      });
+
+      // Apply manual pagination
+      const startIndex = offset || 0;
+      const endIndex = startIndex + (limit || 20);
+      const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
+
+      return paginatedJobs.map(jobData => new Job(jobData));
+    } catch (error) {
+      console.error('Error getting recent jobs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Advanced job search with comprehensive filters
+   * @param {Object} filters - Search filters object
+   * @param {number} limit - Maximum number of jobs to return
+   * @param {number} offset - Number of jobs to skip
+   * @param {string} sortBy - Field to sort by
+   * @param {string} sortOrder - Sort order (asc/desc)
+   * @returns {Promise<{jobs: Job[], totalJobs: number, hasMore: boolean}>}
+   */
+  static async advancedSearchJobs(filters = {}, limit = 20, offset = 0, sortBy = 'publishedAt', sortOrder = 'desc') {
+    try {
+      // Base filters - only published and active jobs
+      const searchFilters = [
+        { field: 'jobStatus', operator: '==', value: 'published' },
+        { field: 'isActive', operator: '==', value: true }
+      ];
+
+      // Get all published jobs first, then filter locally for complex logic
+      const jobs = await databaseService.query(
+        COLLECTIONS.JOBS, 
+        searchFilters,
+        { field: sortBy, direction: sortOrder },
+        (limit + offset) * 2 // Get more to allow for filtering
+      );
+
+      let filteredJobs = jobs.data || jobs;
+
+      // Apply text search filter
+      if (filters.q) {
+        const searchTerm = filters.q.toLowerCase();
+        filteredJobs = filteredJobs.filter(job => 
+          (job.roleName && job.roleName.toLowerCase().includes(searchTerm)) ||
+          (job.jobSummary && job.jobSummary.toLowerCase().includes(searchTerm)) ||
+          (job.companyName && job.companyName.toLowerCase().includes(searchTerm)) ||
+          (job.brandName && job.brandName.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      // Apply category filter (map to role names)
+      if (filters.category && filters.category !== 'all') {
+        const categoryRoleMap = {
+          'fashion': ['Sales Associate', 'Fashion Consultant', 'Retail Associate'],
+          'fast-food': ['Cashier', 'Cook', 'Server', 'Kitchen Assistant'],
+          'sportswear': ['Sales Associate', 'Fitness Instructor', 'Store Associate'],
+          'security': ['Security Guard', 'Security Officer'],
+          'customer-service': ['Customer Service', 'Customer Support', 'Help Desk']
+        };
+        
+        const categoryRoles = categoryRoleMap[filters.category] || [];
+        if (categoryRoles.length > 0) {
+          filteredJobs = filteredJobs.filter(job => 
+            job.roleName && categoryRoles.some(role => 
+              job.roleName.toLowerCase().includes(role.toLowerCase())
+            )
+          );
+        }
+      }
+
+      // Apply location filters
+      if (filters.governorate) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.governorate && job.governorate.toLowerCase() === filters.governorate.toLowerCase()
+        );
+      }
+
+      if (filters.wilayat) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.wilayat && job.wilayat.toLowerCase() === filters.wilayat.toLowerCase()
+        );
+      }
+
+      // Apply role filters
+      if (filters.roles && filters.roles.length > 0) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.roleName && filters.roles.some(role => 
+            job.roleName.toLowerCase().includes(role.toLowerCase())
+          )
+        );
+      }
+
+      // Apply hiring type filter
+      if (filters.hiringType) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.hiringType === filters.hiringType
+        );
+      }
+
+      // Apply work type filter
+      if (filters.workType) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.workType === filters.workType
+        );
+      }
+
+      // Apply shift types filter
+      if (filters.shiftTypes && filters.shiftTypes.length > 0) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.shiftTypes && job.shiftTypes.some(shift => 
+            filters.shiftTypes.includes(shift)
+          )
+        );
+      }
+
+      // Apply skills filter
+      if (filters.skills && filters.skills.length > 0) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.requiredSkills && job.requiredSkills.some(skill => 
+            filters.skills.some(filterSkill => 
+              skill.toLowerCase().includes(filterSkill.toLowerCase())
+            )
+          )
+        );
+      }
+
+      // Apply languages filter
+      if (filters.languages && filters.languages.length > 0) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.requiredLanguages && job.requiredLanguages.some(lang => 
+            filters.languages.some(filterLang => 
+              lang.toLowerCase().includes(filterLang.toLowerCase())
+            )
+          )
+        );
+      }
+
+      // Apply gender preference filter
+      if (filters.genderPreference && filters.genderPreference !== 'Both') {
+        filteredJobs = filteredJobs.filter(job => 
+          !job.genderPreference || 
+          job.genderPreference === 'Both' || 
+          job.genderPreference === filters.genderPreference
+        );
+      }
+
+      // Apply pay range filters
+      if (filters.minPay !== null) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.payPerHour && job.payPerHour >= filters.minPay
+        );
+      }
+
+      if (filters.maxPay !== null) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.payPerHour && job.payPerHour <= filters.maxPay
+        );
+      }
+
+      // Apply hours filters
+      if (filters.minHours !== null) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.hoursPerDay && job.hoursPerDay >= filters.minHours
+        );
+      }
+
+      if (filters.maxHours !== null) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.hoursPerDay && job.hoursPerDay <= filters.maxHours
+        );
+      }
+
+      // Apply date filters
+      if (filters.publishedAfter) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.publishedAt && new Date(job.publishedAt) >= filters.publishedAfter
+        );
+      }
+
+      if (filters.startDateAfter) {
+        filteredJobs = filteredJobs.filter(job => 
+          job.startDate && new Date(job.startDate) >= filters.startDateAfter
+        );
+      }
+
+      // Get total count before pagination
+      const totalJobs = filteredJobs.length;
+
+      // Apply pagination
+      const paginatedJobs = filteredJobs.slice(offset, offset + limit);
+      const hasMore = offset + limit < totalJobs;
+
+      return {
+        jobs: paginatedJobs.map(jobData => new Job(jobData)),
+        totalJobs,
+        hasMore
+      };
+    } catch (error) {
+      console.error('Error in advanced job search:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save job for user
+   */
+  static async saveJobForUser(jobId, userId) {
+    try {
+      // Check if already saved
+      const existingSaved = await databaseService.query(
+        'savedJobs',
+        [
+          { field: 'jobId', operator: '==', value: jobId },
+          { field: 'userId', operator: '==', value: userId }
+        ]
+      );
+
+      if (existingSaved.length > 0) {
+        throw new Error('Job already saved');
+      }
+
+      // Save job
+      const savedJobData = {
+        jobId,
+        userId,
+        savedAt: new Date().toISOString(),
+        isActive: true
+      };
+
+      const savedJob = await databaseService.create('savedJobs', savedJobData);
+      return { id: savedJob.id, savedAt: savedJobData.savedAt };
+    } catch (error) {
+      console.error('Error saving job for user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove saved job for user
+   */
+  static async unsaveJobForUser(jobId, userId) {
+    try {
+      // Find saved job
+      const savedJobs = await databaseService.query(
+        'savedJobs',
+        [
+          { field: 'jobId', operator: '==', value: jobId },
+          { field: 'userId', operator: '==', value: userId }
+        ]
+      );
+
+      if (savedJobs.length === 0) {
+        return false;
+      }
+
+      // Remove saved job
+      await databaseService.delete('savedJobs', savedJobs[0].id);
+      return true;
+    } catch (error) {
+      console.error('Error removing saved job for user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get saved jobs for user
+   */
+  static async getSavedJobsForUser(userId, limit = 20, offset = 0) {
+    try {
+      // Get saved job entries
+      const savedJobEntries = await databaseService.query(
+        'savedJobs',
+        [
+          { field: 'userId', operator: '==', value: userId },
+          { field: 'isActive', operator: '==', value: true }
+        ]
+      );
+
+      const totalJobs = savedJobEntries.length;
+      const paginatedEntries = savedJobEntries.slice(offset, offset + limit);
+
+      // Get job details for saved jobs
+      const jobs = [];
+      for (const entry of paginatedEntries) {
+        try {
+          const job = await Job.findById(entry.jobId);
+          if (job && job.jobStatus === 'published' && job.isActive) {
+            jobs.push(job);
+          }
+        } catch (error) {
+          console.error(`Error fetching saved job ${entry.jobId}:`, error);
+          // Continue with other jobs
+        }
+      }
+
+      return {
+        jobs,
+        totalJobs,
+        hasMore: offset + limit < totalJobs
+      };
+    } catch (error) {
+      console.error('Error getting saved jobs for user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if job is saved by user
+   */
+  static async isJobSavedByUser(jobId, userId) {
+    try {
+      const savedJobs = await databaseService.query(
+        'savedJobs',
+        [
+          { field: 'jobId', operator: '==', value: jobId },
+          { field: 'userId', operator: '==', value: userId }
+        ]
+      );
+
+      return savedJobs.length > 0;
+    } catch (error) {
+      console.error('Error checking if job is saved:', error);
+      return false;
     }
   }
 }

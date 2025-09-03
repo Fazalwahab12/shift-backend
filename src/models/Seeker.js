@@ -83,6 +83,10 @@ class Seeker {
     this.companyRatings = data.companyRatings || []; // Ratings received from companies
     this.averageRating = data.averageRating || null; // Average rating from companies
     
+    // Blocking status tracking
+    this.blockedByCompanies = data.blockedByCompanies || []; // Companies that have blocked this seeker
+    this.totalBlocks = data.totalBlocks || 0; // Total times blocked (for analytics)
+    
     // CV File (missing from original model)
     this.cvFile = data.cvFile || null; // CV file URL
     
@@ -629,6 +633,142 @@ class Seeker {
   }
 
   /**
+   * Record that seeker has been blocked by a company
+   */
+  async recordBlockedByCompany(companyId, companyName, reason, blockedAt) {
+    try {
+      // Check if already recorded
+      const existingBlock = this.blockedByCompanies.find(block => 
+        block.companyId === companyId && block.isActive
+      );
+      
+      if (existingBlock) {
+        return this; // Already recorded
+      }
+
+      const blockEntry = {
+        companyId: companyId,
+        companyName: companyName,
+        reason: reason,
+        blockedAt: blockedAt,
+        isActive: true
+      };
+
+      this.blockedByCompanies.push(blockEntry);
+      this.totalBlocks += 1;
+
+      // Reduce activity score for being blocked
+      const newScore = Math.max(0, this.activityScore - 10);
+
+      await this.update({
+        blockedByCompanies: this.blockedByCompanies,
+        totalBlocks: this.totalBlocks,
+        activityScore: newScore,
+        updatedAt: new Date().toISOString()
+      });
+
+      console.log(`🚫 Seeker ${this.id} recorded as blocked by company ${companyId}`);
+      return this;
+    } catch (error) {
+      console.error('Error recording block by company:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record that seeker has been unblocked by a company
+   */
+  async recordUnblockedByCompany(companyId, unblockReason, unblockedAt) {
+    try {
+      const blockIndex = this.blockedByCompanies.findIndex(block => 
+        block.companyId === companyId && block.isActive
+      );
+
+      if (blockIndex === -1) {
+        return this; // Not found or already inactive
+      }
+
+      // Mark as inactive
+      this.blockedByCompanies[blockIndex].isActive = false;
+      this.blockedByCompanies[blockIndex].unblockedAt = unblockedAt;
+      this.blockedByCompanies[blockIndex].unblockReason = unblockReason;
+
+      // Improve activity score slightly for being unblocked
+      const newScore = Math.min(100, this.activityScore + 5);
+
+      await this.update({
+        blockedByCompanies: this.blockedByCompanies,
+        activityScore: newScore,
+        updatedAt: new Date().toISOString()
+      });
+
+      console.log(`✅ Seeker ${this.id} recorded as unblocked by company ${companyId}`);
+      return this;
+    } catch (error) {
+      console.error('Error recording unblock by company:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if seeker is blocked by a specific company
+   */
+  isBlockedByCompany(companyId) {
+    return this.blockedByCompanies.some(block => 
+      block.companyId === companyId && block.isActive
+    );
+  }
+
+  /**
+   * Get list of companies that have blocked this seeker
+   */
+  getBlockingCompanies(activeOnly = true) {
+    if (activeOnly) {
+      return this.blockedByCompanies.filter(block => block.isActive);
+    }
+    return this.blockedByCompanies;
+  }
+
+  /**
+   * Get blocking statistics for this seeker
+   */
+  getBlockingStats() {
+    const activeBlocks = this.blockedByCompanies.filter(block => block.isActive);
+    const historicalBlocks = this.blockedByCompanies.length;
+
+    // Group by reason
+    const reasonStats = {};
+    activeBlocks.forEach(block => {
+      const reason = block.reason || 'No reason provided';
+      reasonStats[reason] = (reasonStats[reason] || 0) + 1;
+    });
+
+    return {
+      currentlyBlockedByCompanies: activeBlocks.length,
+      totalHistoricalBlocks: historicalBlocks,
+      totalBlocksRecorded: this.totalBlocks,
+      activeBlocks: activeBlocks.map(block => ({
+        companyId: block.companyId,
+        companyName: block.companyName,
+        reason: block.reason,
+        blockedAt: block.blockedAt
+      })),
+      reasonBreakdown: reasonStats,
+      impactOnActivityScore: this.totalBlocks * 10 // Each block reduces score by 10
+    };
+  }
+
+  /**
+   * Check if seeker can apply to jobs (not blocked everywhere)
+   */
+  canApplyToJobs() {
+    const baseEligibility = this.isAvailableForJobs();
+    const tooManyBlocks = this.totalBlocks >= 10; // Threshold for too many blocks
+    
+    return baseEligibility && !tooManyBlocks;
+  }
+
+  /**
    * Search seekers by criteria with advanced filtering
    */
   static async search(searchCriteria = {}) {
@@ -916,6 +1056,10 @@ class Seeker {
       hireHistory: this.hireHistory,
       companyRatings: this.companyRatings,
       averageRating: this.averageRating,
+      
+      // Blocking status tracking
+      blockedByCompanies: this.blockedByCompanies,
+      totalBlocks: this.totalBlocks,
       
       // CV File
       cvFile: this.cvFile

@@ -64,17 +64,22 @@ router.get('/applications/:applicationId', JobApplicationController.getApplicati
 router.put('/applications/:applicationId/accept', JobApplicationController.acceptApplication);
 
 /**
- * @route   PUT /api/applications/:applicationId/reject
- * @desc    Reject job application (company only)
+ * @route   PUT /api/applications/:applicationId/decline
+ * @desc    Decline job application with specific reasons (company only)
  * @access  Private (Company)
  */
-router.put('/applications/:applicationId/reject', [
+router.put('/applications/:applicationId/decline', [
   body('reason')
-    .optional()
-    .isString()
-    .isLength({ max: 500 })
-    .withMessage('Rejection reason must be a string with max 500 characters')
-], JobApplicationController.rejectApplication);
+    .isIn(['Another candidate selected', 'Not the right fit', 'Limited experience', 'Position filled'])
+    .withMessage('Decline reason must be one of: Another candidate selected, Not the right fit, Limited experience, Position filled')
+], JobApplicationController.declineApplication);
+
+/**
+ * @route   PUT /api/applications/:applicationId/hire
+ * @desc    Send hire request to seeker (company only)
+ * @access  Private (Company)
+ */
+router.put('/applications/:applicationId/hire', JobApplicationController.sendHireRequest);
 
 /**
  * @route   PUT /api/applications/:applicationId/shortlist
@@ -85,7 +90,7 @@ router.put('/applications/:applicationId/shortlist', JobApplicationController.sh
 
 /**
  * @route   PUT /api/applications/:applicationId/interview
- * @desc    Schedule interview (company only) - TRIGGERS CHAT CREATION
+ * @desc    Schedule interview with duration support (company only) - TRIGGERS CHAT CREATION
  * @access  Private (Company)
  */
 router.put('/applications/:applicationId/interview', [
@@ -96,7 +101,25 @@ router.put('/applications/:applicationId/interview', [
   body('interviewTime')
     .notEmpty()
     .matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/)
-    .withMessage('Interview time is required and must be in HH:MM format')
+    .withMessage('Interview time is required and must be in HH:MM format'),
+  body('duration')
+    .optional()
+    .isInt({ min: 15, max: 180 })
+    .withMessage('Interview duration must be between 15 and 180 minutes'),
+  body('interviewType')
+    .optional()
+    .isIn(['in-person', 'phone', 'video'])
+    .withMessage('Interview type must be in-person, phone, or video'),
+  body('location')
+    .optional()
+    .isString()
+    .isLength({ max: 255 })
+    .withMessage('Location must be a string with max 255 characters'),
+  body('notes')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('Notes must be a string with max 500 characters')
 ], JobApplicationController.scheduleInterview);
 
 /**
@@ -106,5 +129,115 @@ router.put('/applications/:applicationId/interview', [
  */
 router.put('/applications/:applicationId/withdraw', JobApplicationController.withdrawApplication);
 
+/**
+ * @route   POST /api/jobs/:jobId/invite/:seekerId
+ * @desc    Invite seeker to apply for job (company only)
+ * @access  Private (Company)
+ */
+router.post('/jobs/:jobId/invite/:seekerId', JobApplicationController.inviteSeeker);
+
+/**
+ * @route   PUT /api/applications/:applicationId/accept-invitation
+ * @desc    Accept invitation and apply to job (seeker only)
+ * @access  Private (Seeker)
+ */
+router.put('/applications/:applicationId/accept-invitation', JobApplicationController.acceptInvitation);
+
+/**
+ * @route   PUT /api/applications/:applicationId/hire-response
+ * @desc    Respond to hire request (seeker only)
+ * @access  Private (Seeker)
+ */
+router.put('/applications/:applicationId/hire-response', [
+  body('response')
+    .isIn(['accepted', 'rejected'])
+    .withMessage('Response must be either "accepted" or "rejected"')
+], JobApplicationController.respondToHireRequest);
+
+/**
+ * @route   POST /api/applications/:applicationId/report
+ * @desc    Report attendance/absence (company or seeker)
+ * @access  Private
+ */
+router.post('/applications/:applicationId/report', [
+  body('date')
+    .optional()
+    .isISO8601()
+    .withMessage('Date must be a valid ISO date'),
+  body('status')
+    .isIn(['present', 'absent', 'late'])
+    .withMessage('Status must be present, absent, or late'),
+  body('reason')
+    .optional()
+    .isString()
+    .isLength({ max: 255 })
+    .withMessage('Reason must be a string with max 255 characters'),
+  body('notes')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('Notes must be a string with max 500 characters')
+], JobApplicationController.reportAbsence);
+
+/**
+ * @route   GET /api/applications/:applicationId/reports
+ * @desc    Get attendance reports for application
+ * @access  Private
+ */
+router.get('/applications/:applicationId/reports', JobApplicationController.getReports);
+
+/**
+ * @route   POST /api/company/block-seeker
+ * @desc    Block a seeker from applying to company jobs
+ * @access  Private (Company)
+ */
+router.post('/company/block-seeker', [
+  body('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('reason')
+    .isString()
+    .isLength({ min: 5, max: 500 })
+    .withMessage('Reason is required and must be between 5 and 500 characters')
+], JobApplicationController.blockSeeker);
+
+/**
+ * @route   PUT /api/company/unblock-seeker/:seekerId
+ * @desc    Unblock a previously blocked seeker
+ * @access  Private (Company)
+ */
+router.put('/company/unblock-seeker/:seekerId', [
+  body('reason')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('Unblock reason must be a string with max 500 characters')
+], JobApplicationController.unblockSeeker);
+
+/**
+ * @route   GET /api/company/blocked-seekers
+ * @desc    Get list of blocked seekers for company
+ * @access  Private (Company)
+ */
+router.get('/company/blocked-seekers', JobApplicationController.getBlockedSeekers);
+
+/**
+ * @route   GET /api/company/blocking-stats
+ * @desc    Get blocking statistics for company
+ * @access  Private (Company)
+ */
+router.get('/company/blocking-stats', JobApplicationController.getBlockingStats);
+
+/**
+ * @route   PUT /api/applications/:applicationId/block-seeker
+ * @desc    Block seeker directly from application (convenience route)
+ * @access  Private (Company)
+ */
+router.put('/applications/:applicationId/block-seeker', [
+  body('reason')
+    .isString()
+    .isLength({ min: 5, max: 500 })
+    .withMessage('Block reason is required and must be between 5 and 500 characters')
+], JobApplicationController.blockSeekerFromApplication);
+
 module.exports = router;
-router.use(authenticateToken);

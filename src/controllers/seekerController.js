@@ -1,3 +1,4 @@
+
 const Seeker = require('../models/Seeker');
 const User = require('../models/User');
 const OnboardingData = require('../models/OnboardingData');
@@ -1193,6 +1194,7 @@ class SeekerController {
 
       // Check if Firebase is configured
       if (!global.firebase || !global.firebase.storage) {
+        console.error('❌ Firebase Storage not available');
         return res.status(500).json({
           success: false,
           message: 'Firebase Storage not configured'
@@ -1206,8 +1208,27 @@ class SeekerController {
         const fileExtension = req.file.originalname.split('.').pop();
         const fileName = `profiles/seekers/${timestamp}-${randomId}.${fileExtension}`;
 
-        // Upload to Firebase Storage
-        const bucket = global.firebase.storage().bucket();
+        // Upload to Firebase Storage - use the storage instance directly
+        console.log('🔧 Attempting to access Firebase Storage bucket...');
+        
+        // Access Firebase Storage bucket properly
+        let bucket;
+        try {
+          // Use the configured Firebase storage instance
+          bucket = global.firebase.storage().bucket();
+          console.log('✅ Successfully accessed default Firebase Storage bucket');
+        } catch (bucketError) {
+          console.error('❌ Default bucket failed, trying with explicit name:', bucketError.message);
+          try {
+            // Try with explicit bucket name from config
+            const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'shipt-ed0e2';
+            bucket = global.firebase.storage().bucket(bucketName);
+            console.log(`✅ Successfully accessed Firebase Storage bucket: ${bucketName}`);
+          } catch (explicitBucketError) {
+            console.error('❌ Both bucket access methods failed:', explicitBucketError.message);
+            throw new Error('Cannot access Firebase Storage bucket');
+          }
+        }
         const file = bucket.file(fileName);
         
         // Create write stream
@@ -1299,6 +1320,181 @@ class SeekerController {
 
     } catch (error) {
       console.error('Error in cleanupPlaceholderUrls:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get blocking status for seeker
+   * GET /api/seekers/blocking-status
+   */
+  static async getBlockingStatus(req, res) {
+    try {
+      const userId = req.user.userId;
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Blocking status retrieved successfully',
+        data: {
+          seekerId: seeker.id,
+          status: seeker.getStatus(),
+          strikeCount: seeker.strikeCount,
+          activityScore: seeker.activityScore,
+          isBlocked: seeker.getStatus() === 'blocked',
+          isActive: seeker.isActive
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getBlockingStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get blocking status for seeker
+   * GET /api/seekers/blocking-status
+   */
+  static async getBlockingStatus(req, res) {
+    try {
+      const userId = req.user.userId;
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Blocking status retrieved successfully',
+        data: {
+          seekerId: seeker.id,
+          status: seeker.getStatus(),
+          strikeCount: seeker.strikeCount,
+          activityScore: seeker.activityScore,
+          isBlocked: seeker.getStatus() === 'blocked',
+          isActive: seeker.isActive
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getBlockingStatus:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get detailed blocking statistics for seeker
+   * GET /api/seekers/blocking-stats
+   */
+  static async getBlockingStats(req, res) {
+    try {
+      const userId = req.user.userId;
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Blocking statistics retrieved successfully',
+        data: {
+          seekerId: seeker.id,
+          status: seeker.getStatus(),
+          strikeCount: seeker.strikeCount,
+          activityScore: seeker.activityScore,
+          numberOfNoShows: seeker.numberOfNoShows,
+          numberOfHires: seeker.numberOfHires,
+          numberOfInterviews: seeker.numberOfInterviews,
+          totalJobsAppliedTo: seeker.totalJobsAppliedTo,
+          averageRating: seeker.averageRating,
+          isBlocked: seeker.getStatus() === 'blocked',
+          isActive: seeker.isActive,
+          lastActiveDate: seeker.lastActiveDate
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in getBlockingStats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Check if seeker can apply to a specific company
+   * GET /api/seekers/can-apply-to/:companyId
+   */
+  static async canApplyToCompany(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const userId = req.user.userId;
+      const { companyId } = req.params;
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Check if seeker is active and not blocked
+      const canApply = seeker.isActive && seeker.getStatus() !== 'blocked';
+
+      res.status(200).json({
+        success: true,
+        message: 'Application eligibility checked successfully',
+        data: {
+          seekerId: seeker.id,
+          companyId,
+          canApply,
+          status: seeker.getStatus(),
+          isActive: seeker.isActive,
+          reason: !canApply ? 'Seeker is blocked or inactive' : null
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in canApplyToCompany:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

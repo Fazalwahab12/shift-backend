@@ -141,6 +141,198 @@ router.post('/:jobId/publish', authenticateToken, [
 ], JobController.publishJob);
 
 /**
+ * @route   GET /api/jobs/recommendations
+ * @desc    Get job recommendations based on user roles
+ * @access  Public
+ */
+router.get('/recommendations', [
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a string of comma-separated values'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], JobController.getJobRecommendations);
+
+/**
+ * @route   GET /api/jobs/recent
+ * @desc    Get recent jobs from last 10 days
+ * @access  Public
+ */
+router.get('/recent', [
+  query('days')
+    .optional()
+    .isInt({ min: 1, max: 30 })
+    .withMessage('Days must be between 1 and 30'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], JobController.getRecentJobs);
+
+/**
+ * @route   GET /api/jobs/search
+ * @desc    Advanced job search with comprehensive filters
+ * @access  Public
+ */
+router.get('/search', [
+  // Basic search
+  query('q')
+    .optional()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Search query must be between 1 and 200 characters'),
+  query('category')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Category must be between 1 and 50 characters'),
+  
+  // Location filters
+  query('governorate')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Governorate must be between 1 and 50 characters'),
+  query('wilayat')
+    .optional()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Wilayat must be between 1 and 50 characters'),
+  
+  // Job type filters
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('hiringType')
+    .optional()
+    .isIn(['Instant Hire', 'Interview First'])
+    .withMessage('Hiring type must be Instant Hire or Interview First'),
+  query('workType')
+    .optional()
+    .isIn(['hourly', 'short', 'full'])
+    .withMessage('Work type must be hourly, short, or full'),
+  query('shiftTypes')
+    .optional()
+    .isString()
+    .withMessage('Shift types must be a comma-separated string'),
+  
+  // Skills and requirements
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('languages')
+    .optional()
+    .isString()
+    .withMessage('Languages must be a comma-separated string'),
+  query('genderPreference')
+    .optional()
+    .isIn(['Male', 'Female', 'Both'])
+    .withMessage('Gender preference must be Male, Female, or Both'),
+  
+  // Pay range
+  query('minPay')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Minimum pay must be a positive number'),
+  query('maxPay')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Maximum pay must be a positive number'),
+  
+  // Hours and duration
+  query('minHours')
+    .optional()
+    .isInt({ min: 1, max: 24 })
+    .withMessage('Minimum hours must be between 1 and 24'),
+  query('maxHours')
+    .optional()
+    .isInt({ min: 1, max: 24 })
+    .withMessage('Maximum hours must be between 1 and 24'),
+  
+  // Date filters
+  query('publishedAfter')
+    .optional()
+    .isISO8601()
+    .withMessage('Published after must be a valid date'),
+  query('startDateAfter')
+    .optional()
+    .isISO8601()
+    .withMessage('Start date after must be a valid date'),
+  
+  // Sorting and pagination
+  query('sortBy')
+    .optional()
+    .isIn(['publishedAt', 'payPerHour', 'startDate', 'createdAt'])
+    .withMessage('Sort by must be publishedAt, payPerHour, startDate, or createdAt'),
+  query('sortOrder')
+    .optional()
+    .isIn(['asc', 'desc'])
+    .withMessage('Sort order must be asc or desc'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], JobController.searchJobs);
+
+/**
+ * @route   GET /api/jobs/categories
+ * @desc    Get available job categories based on real job data
+ * @access  Public
+ */
+router.get('/categories', JobController.getJobCategories);
+
+/**
+ * @route   GET /api/jobs/saved
+ * @desc    Get saved jobs for seeker
+ * @access  Private (JWT Token Required)
+ */
+router.get('/saved', authenticateToken, [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], JobController.getSavedJobs);
+
+/**
+ * @route   POST /api/jobs/:jobId/save
+ * @desc    Save job for seeker
+ * @access  Private (JWT Token Required)
+ */
+router.post('/:jobId/save', authenticateToken, [
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], JobController.saveJob);
+
+/**
+ * @route   DELETE /api/jobs/:jobId/unsave
+ * @desc    Remove saved job for seeker
+ * @access  Private (JWT Token Required)
+ */
+router.delete('/:jobId/unsave', authenticateToken, [
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], JobController.unsaveJob);
+
+/**
  * @route   GET /api/jobs/:jobId
  * @desc    Get job by ID
  * @access  Public
@@ -177,42 +369,6 @@ router.get('/company/:companyId', [
     .isIn(['draft', 'published', 'paused', 'closed'])
     .withMessage('Status must be draft, published, paused, or closed')
 ], JobController.getJobsByCompany);
-
-/**
- * @route   GET /api/jobs/search
- * @desc    Search published jobs
- * @access  Public
- */
-router.get('/search', [
-  query('governorate')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Governorate must be between 1 and 50 characters'),
-  query('role')
-    .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Role must be between 1 and 100 characters'),
-  query('hiringType')
-    .optional()
-    .isIn(['Instant Hire', 'Interview First'])
-    .withMessage('Hiring type must be Instant Hire or Interview First'),
-  query('minPay')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Minimum pay must be a positive number'),
-  query('maxPay')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Maximum pay must be a positive number'),
-  query('limit')
-    .optional()
-    .isInt({ min: 1, max: 50 })
-    .withMessage('Limit must be between 1 and 50'),
-  query('offset')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Offset must be 0 or greater')
-], JobController.searchJobs);
 
 /**
  * @route   PUT /api/jobs/:jobId

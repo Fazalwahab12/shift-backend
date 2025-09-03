@@ -23,8 +23,9 @@ class FirebaseConfig {
 
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://your-project-id-default-rtdb.firebaseio.com/',
-          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'your-project-id.appspot.com'
+          databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://shipt-ed0e2-default-rtdb.firebaseio.com/',
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'shipt-ed0e2',
+          projectId: process.env.FIREBASE_PROJECT_ID || 'shipt-ed0e2'
         });
 
         console.log('🔥 Firebase Admin SDK initialized successfully');

@@ -205,5 +205,15 @@ router.delete('/:userId/social-media/:socialMedia', [
     .withMessage('Social media is required')
 ], OnboardingController.removeSocialMediaPreference);
 
+/**
+ * @route   GET /api/onboarding/:userId/preferences
+ * @desc    Get user onboarding preferences for job recommendations
+ * @access  Public
+ */
+router.get('/:userId/preferences', [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required')
+], OnboardingController.getUserPreferences);
 
 module.exports = router;
