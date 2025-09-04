@@ -75,6 +75,9 @@ class JobApplicationController {
 
       const application = await JobApplication.create(applicationData);
       
+      // Increment the job's applications count
+      await job.incrementApplications();
+      
       res.status(201).json({
         success: true,
         message: 'Job application submitted successfully',
@@ -623,7 +626,15 @@ class JobApplicationController {
         });
       }
 
+      // Get the job to decrement applications count
+      const job = await Job.findByJobId(application.jobId);
+      
       await application.withdraw();
+      
+      // Decrement the job's applications count if job exists
+      if (job) {
+        await job.decrementApplications();
+      }
       
       res.status(200).json({
         success: true,
@@ -660,7 +671,8 @@ class JobApplicationController {
 
       // Get job details
       const job = await Job.findByJobId(jobId);
-      if (!job || job.companyId !== userId) {
+      
+      if (!job || job.userId !== userId) {
         return res.status(404).json({
           success: false,
           message: 'Job not found or access denied'
@@ -687,6 +699,9 @@ class JobApplicationController {
       };
 
       const application = await JobApplication.create(applicationData);
+      
+      // Increment the job's applications count
+      await job.incrementApplications();
       
       res.status(201).json({
         success: true,

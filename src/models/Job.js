@@ -532,6 +532,19 @@ class Job {
   }
 
   /**
+   * Decrement applications count (when applications are withdrawn/deleted)
+   */
+  async decrementApplications() {
+    try {
+      const newCount = Math.max(0, this.applicationsCount - 1); // Ensure it doesn't go below 0
+      await this.update({ applicationsCount: newCount });
+    } catch (error) {
+      console.error('Error decrementing applications:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get job statistics
    */
   static async getStats(companyId = null) {
