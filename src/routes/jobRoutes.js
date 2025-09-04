@@ -201,10 +201,6 @@ router.get('/search', [
     .optional()
     .isLength({ min: 1, max: 50 })
     .withMessage('Governorate must be between 1 and 50 characters'),
-  query('wilayat')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Wilayat must be between 1 and 50 characters'),
   
   // Job type filters
   query('roles')
@@ -449,5 +445,29 @@ router.get('/trending', [
     .isInt({ min: 1, max: 20 })
     .withMessage('Limit must be between 1 and 20')
 ], JobController.getTrendingJobs);
+
+/**
+ * @route   GET /api/jobs/brands
+ * @desc    Get all active brands with activity scores
+ * @access  Public
+ */
+router.get('/brands', [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater'),
+  query('sortBy')
+    .optional()
+    .isIn(['activityScore', 'jobCount', 'locationCount', 'name'])
+    .withMessage('Sort by must be activityScore, jobCount, locationCount, or name'),
+  query('sortOrder')
+    .optional()
+    .isIn(['asc', 'desc'])
+    .withMessage('Sort order must be asc or desc')
+], JobController.getAllBrands);
 
 module.exports = router;

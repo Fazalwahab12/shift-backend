@@ -3,6 +3,7 @@ const Seeker = require('../models/Seeker');
 const User = require('../models/User');
 const OnboardingData = require('../models/OnboardingData');
 const { validationResult } = require('express-validator');
+const { databaseService, COLLECTIONS } = require('../config/database');
 
 /**
  * Seeker Profile Controller
@@ -1530,6 +1531,255 @@ class SeekerController {
 
     } catch (error) {
       console.error('Error in exportSeekerData:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get seeker recommendations for companies based on roles, skills, and industries
+   * GET /api/seekers/recommendations
+   */
+  static async getSeekerRecommendations(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { roles, skills, limit = 20, offset = 0 } = req.query;
+      
+      if (!roles && !skills) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one role or skill parameter is required for recommendations'
+        });
+      }
+
+      // Parse comma-separated roles and skills
+      const roleArray = roles ? roles.split(',').map(role => role.trim()) : [];
+      const skillArray = skills ? skills.split(',').map(skill => skill.trim()) : [];
+      
+      // Get recommended seekers based on roles and skills
+      const seekers = await Seeker.getRecommendationsByRolesAndSkills(roleArray, skillArray, parseInt(limit), parseInt(offset));
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker recommendations retrieved successfully',
+        data: {
+          seekers: seekers.map(seeker => seeker.toPublicJSON()),
+          totalSeekers: seekers.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          matchedRoles: roleArray,
+          matchedSkills: skillArray
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting seeker recommendations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Save seeker for company user
+   * POST /api/seekers/:seekerId/save
+   */
+  static async saveSeeker(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { seekerId } = req.params;
+      const companyUserId = req.user.userId;
+
+      // Verify user is a company
+      if (req.user.userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can save seekers'
+        });
+      }
+
+      // Save seeker for company user
+      const savedSeeker = await Seeker.saveSeekerForCompany(seekerId, companyUserId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker saved successfully',
+        data: {
+          savedSeekerId: savedSeeker.id,
+          seekerId: seekerId,
+          savedAt: savedSeeker.savedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error saving seeker:', error);
+      if (error.message === 'Seeker already saved') {
+        return res.status(409).json({
+          success: false,
+          message: 'Seeker already saved'
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Remove saved seeker for company user
+   * DELETE /api/seekers/:seekerId/unsave
+   */
+  static async unsaveSeeker(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { seekerId } = req.params;
+      const companyUserId = req.user.userId;
+
+      // Verify user is a company
+      if (req.user.userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can unsave seekers'
+        });
+      }
+
+      // Remove saved seeker for company user
+      const removed = await Seeker.unsaveSeekerForCompany(seekerId, companyUserId);
+
+      if (!removed) {
+        return res.status(404).json({
+          success: false,
+          message: 'Saved seeker not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker removed from saved list successfully'
+      });
+
+    } catch (error) {
+      console.error('Error removing saved seeker:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get saved seekers for company user
+   * GET /api/seekers/saved
+   */
+  static async getSavedSeekers(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const companyUserId = req.user.userId;
+      
+      // Verify user is a company
+      if (req.user.userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can access saved seekers'
+        });
+      }
+
+      const limit = parseInt(req.query.limit) || 20;
+      const offset = parseInt(req.query.offset) || 0;
+
+      // Get saved seekers for company user
+      const savedSeekers = await Seeker.getSavedSeekersForCompany(companyUserId, limit, offset);
+
+      res.status(200).json({
+        success: true,
+        message: 'Saved seekers retrieved successfully',
+        data: {
+          seekers: savedSeekers.seekers,
+          totalSeekers: savedSeekers.totalSeekers,
+          hasMore: savedSeekers.hasMore,
+          limit,
+          offset
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting saved seekers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Check if seeker is saved by company user
+   * GET /api/seekers/:seekerId/is-saved
+   */
+  static async checkSeekerSaved(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const companyUserId = req.user.userId;
+
+      // Verify user is a company
+      if (req.user.userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can check saved status'
+        });
+      }
+
+      const isSaved = await Seeker.isSeekerSavedByCompany(seekerId, companyUserId);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          isSaved: isSaved
+        }
+      });
+
+    } catch (error) {
+      console.error('Error checking seeker saved status:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',

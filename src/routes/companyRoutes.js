@@ -1240,4 +1240,104 @@ router.get('/:companyId/jobs/trending', authenticateToken, [
     .withMessage('Limit must be between 1 and 20')
 ], CompanyController.getCompanyTrendingJobs);
 
+/**
+ * @route   GET /api/companies/brands/recommendations
+ * @desc    Get brand recommendations based on seeker skills and roles
+ * @access  Private (JWT Token Required)
+ */
+router.get('/brands/recommendations', authenticateToken, [
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], CompanyController.getBrandRecommendations);
+
+/**
+ * @route   POST /api/companies/brands/:brandId/follow
+ * @desc    Follow a brand
+ * @access  Private (JWT Token Required - Seeker)
+ */
+router.post('/brands/:brandId/follow', authenticateToken, [
+  param('brandId')
+    .notEmpty()
+    .withMessage('Brand ID is required')
+], CompanyController.followBrand);
+
+/**
+ * @route   DELETE /api/companies/brands/:brandId/follow
+ * @desc    Unfollow a brand
+ * @access  Private (JWT Token Required - Seeker)
+ */
+router.delete('/brands/:brandId/follow', authenticateToken, [
+  param('brandId')
+    .notEmpty()
+    .withMessage('Brand ID is required')
+], CompanyController.unfollowBrand);
+
+/**
+ * @route   GET /api/companies/brands/followed
+ * @desc    Get seeker's followed brands
+ * @access  Private (JWT Token Required - Seeker)
+ */
+router.get('/brands/followed', authenticateToken, [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], CompanyController.getFollowedBrands);
+
+/**
+ * @route   GET /api/companies/brands/:brandId/jobs
+ * @desc    Get jobs from a specific brand that match seeker's skills/roles
+ * @access  Private (JWT Token Required - Seeker)
+ */
+router.get('/brands/:brandId/jobs', authenticateToken, [
+  param('brandId')
+    .notEmpty()
+    .withMessage('Brand ID is required'),
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], CompanyController.getBrandJobs);
+
+/**
+ * @route   GET /api/companies/brands/:brandId/details
+ * @desc    Get brand details with activity score and metrics
+ * @access  Public
+ */
+router.get('/brands/:brandId/details', [
+  param('brandId')
+    .notEmpty()
+    .withMessage('Brand ID is required')
+], CompanyController.getBrandDetails);
+
 module.exports = router;

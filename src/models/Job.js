@@ -65,7 +65,6 @@ class Job {
     this.brandName = data.brandName || null;
     this.locationAddress = data.locationAddress || null;
     this.governorate = data.governorate || null;
-    this.wilayat = data.wilayat || null;
     
     // Search & Matching Fields
     this.searchTags = data.searchTags || []; // Generated from role, skills, location
@@ -123,9 +122,6 @@ class Job {
     // Add location
     if (this.governorate) {
       tags.push(this.governorate.toLowerCase());
-    }
-    if (this.wilayat) {
-      tags.push(this.wilayat.toLowerCase());
     }
     
     // Add company/brand
@@ -317,7 +313,6 @@ class Job {
       brandName: this.brandName,
       locationAddress: this.locationAddress,
       governorate: this.governorate,
-      wilayat: this.wilayat,
       searchTags: this.searchTags,
       experienceLevel: this.experienceLevel
     };
@@ -335,7 +330,6 @@ class Job {
       brandName: this.brandName,
       locationAddress: this.locationAddress,
       governorate: this.governorate,
-      wilayat: this.wilayat,
       jobCoverImage: this.jobCoverImage,
       jobSummary: this.jobSummary,
       hiringType: this.hiringType,
@@ -729,11 +723,6 @@ class Job {
         );
       }
 
-      if (filters.wilayat) {
-        filteredJobs = filteredJobs.filter(job => 
-          job.wilayat && job.wilayat.toLowerCase() === filters.wilayat.toLowerCase()
-        );
-      }
 
       // Apply role filters
       if (filters.roles && filters.roles.length > 0) {

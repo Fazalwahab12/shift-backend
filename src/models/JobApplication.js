@@ -85,12 +85,9 @@ class JobApplication {
       // Check if seeker is blocked by company
       await JobApplication.checkSeekerBlocked(applicationData.companyId, applicationData.seekerId);
       
-      // Get job details to determine job type
-      const Job = require('./Job');
-      const job = await Job.findById(applicationData.jobId);
-      if (job) {
-        applicationData.jobType = job.hiringType; // 'Instant Hire' or 'Interview First'
-        applicationData.jobTitle = applicationData.jobTitle || job.roleName;
+      // Job details should already be provided in applicationData
+      if (applicationData.hiringType) {
+        applicationData.jobType = applicationData.hiringType; // 'Instant Hire' or 'Interview First'
       }
       
       const application = new JobApplication(applicationData);
@@ -114,7 +111,7 @@ class JobApplication {
    */
   static async findById(applicationId) {
     try {
-      const data = await databaseService.findById(COLLECTIONS.JOB_APPLICATIONS, applicationId);
+      const data = await databaseService.getById(COLLECTIONS.JOB_APPLICATIONS, applicationId);
       return data ? new JobApplication(data) : null;
     } catch (error) {
       console.error('Error finding job application:', error);
@@ -127,16 +124,18 @@ class JobApplication {
    */
   static async findByJobId(jobId, options = {}) {
     try {
-      const query = { jobId };
+      const filters = [{ field: 'jobId', operator: '==', value: jobId }];
+      
       if (options.status) {
-        query.status = options.status;
+        filters.push({ field: 'status', operator: '==', value: options.status });
       }
       
-      const applications = await databaseService.find(COLLECTIONS.JOB_APPLICATIONS, query, {
-        sort: { appliedAt: -1 },
-        limit: options.limit || 50,
-        skip: options.offset || 0
-      });
+      const applications = await databaseService.query(
+        COLLECTIONS.JOB_APPLICATIONS, 
+        filters,
+        { field: 'appliedAt', direction: 'desc' },
+        options.limit || 50
+      );
       
       return applications.map(app => new JobApplication(app));
     } catch (error) {
@@ -150,16 +149,22 @@ class JobApplication {
    */
   static async findBySeekerId(seekerId, options = {}) {
     try {
-      const query = { seekerId };
+      const filters = [{ field: 'seekerId', operator: '==', value: seekerId }];
+      
       if (options.status) {
-        query.status = options.status;
+        filters.push({ field: 'status', operator: '==', value: options.status });
       }
       
-      const applications = await databaseService.find(COLLECTIONS.JOB_APPLICATIONS, query, {
-        sort: { appliedAt: -1 },
-        limit: options.limit || 50,
-        skip: options.offset || 0
-      });
+      if (options.jobId) {
+        filters.push({ field: 'jobId', operator: '==', value: options.jobId });
+      }
+      
+      const applications = await databaseService.query(
+        COLLECTIONS.JOB_APPLICATIONS, 
+        filters,
+        { field: 'appliedAt', direction: 'desc' },
+        options.limit || 50
+      );
       
       return applications.map(app => new JobApplication(app));
     } catch (error) {
@@ -782,20 +787,11 @@ class JobApplication {
    */
   static async getStats(jobId) {
     try {
-      const pipeline = [
-        { $match: { jobId } },
-        {
-          $group: {
-            _id: '$status',
-            count: { $sum: 1 }
-          }
-        }
-      ];
-      
-      const results = await databaseService.aggregate(COLLECTIONS.JOB_APPLICATIONS, pipeline);
+      // Get all applications for this job
+      const applications = await this.findByJobId(jobId);
       
       const stats = {
-        total: 0,
+        total: applications.length,
         applied: 0,
         invited: 0,
         reviewed: 0,
@@ -806,9 +802,12 @@ class JobApplication {
         withdrawn: 0
       };
       
-      results.forEach(result => {
-        stats[result._id] = result.count;
-        stats.total += result.count;
+      // Count by status
+      applications.forEach(app => {
+        const status = app.status;
+        if (stats.hasOwnProperty(status)) {
+          stats[status]++;
+        }
       });
       
       return stats;

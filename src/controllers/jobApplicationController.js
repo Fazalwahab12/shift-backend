@@ -69,7 +69,8 @@ class JobApplicationController {
         expectedSalary,
         availability,
         jobTitle: job.roleName,
-        companyName: job.companyName
+        companyName: job.companyName,
+        hiringType: job.hiringType
       };
 
       const application = await JobApplication.create(applicationData);
@@ -1105,6 +1106,51 @@ class JobApplicationController {
       res.status(500).json({
         success: false,
         message: 'Failed to block seeker from application',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Check if seeker has applied to a job
+   * GET /api/jobs/:jobId/application-status
+   */
+  static async checkApplicationStatus(req, res) {
+    try {
+      const { jobId } = req.params;
+      const { userId, userType } = req.user;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can check application status'
+        });
+      }
+
+      // Check if application exists
+      const applications = await JobApplication.findBySeekerId(userId, { jobId });
+      const hasApplied = applications.length > 0;
+      
+      let applicationData = null;
+      if (hasApplied) {
+        applicationData = applications[0].toJSON();
+      }
+
+      res.status(200).json({
+        success: true,
+        message: hasApplied ? 'Application found' : 'No application found',
+        data: {
+          hasApplied,
+          application: applicationData
+        }
+      });
+
+    } catch (error) {
+      console.error('Error checking application status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check application status',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

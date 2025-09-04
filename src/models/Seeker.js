@@ -1072,6 +1072,7 @@ class Seeker {
   toPublicJSON() {
     return {
       id: this.id,
+      seekerId: this.id, // Add seekerId for frontend compatibility
       userId: this.userId,
       
       // Personal Information (including previously missing fields)
@@ -1209,6 +1210,205 @@ class Seeker {
       acceptedAt: this.acceptedAt,
       confirmedAt: this.confirmedAt
     };
+  }
+
+  /**
+   * Get seeker recommendations based on roles and skills
+   */
+  static async getRecommendationsByRolesAndSkills(roles = [], skills = [], limit = 20, offset = 0) {
+    try {
+      const searchFilters = [
+        { field: 'profileConfirmed', operator: '==', value: true },
+        { field: 'isActive', operator: '==', value: true }
+      ];
+
+      // Get all active and confirmed seekers first
+      const seekers = await databaseService.query(
+        COLLECTIONS.SEEKERS, 
+        searchFilters,
+        { field: 'updatedAt', direction: 'desc' },
+        limit * 2 // Get more to filter locally
+      );
+
+      let filteredSeekers = seekers.data || seekers;
+      
+      // Filter by roles and skills if provided
+      if ((roles && roles.length > 0) || (skills && skills.length > 0)) {
+        filteredSeekers = filteredSeekers.filter(seekerData => {
+          let matchesRole = false;
+          let matchesSkill = false;
+          
+          // Check role match
+          if (roles && roles.length > 0 && seekerData.roles && seekerData.roles.length > 0) {
+            matchesRole = roles.some(role => 
+              seekerData.roles.some(seekerRole =>
+                seekerRole.toLowerCase().includes(role.toLowerCase()) ||
+                role.toLowerCase().includes(seekerRole.toLowerCase())
+              )
+            );
+          }
+          
+          // Check skill match  
+          if (skills && skills.length > 0 && seekerData.skills && seekerData.skills.length > 0) {
+            matchesSkill = skills.some(skill => 
+              seekerData.skills.some(seekerSkill =>
+                seekerSkill.toLowerCase().includes(skill.toLowerCase()) ||
+                skill.toLowerCase().includes(seekerSkill.toLowerCase())
+              )
+            );
+          }
+          
+          // Return seekers that match either roles or skills (OR logic)
+          return matchesRole || matchesSkill;
+        });
+      }
+
+      // Apply manual pagination
+      const startIndex = offset || 0;
+      const endIndex = startIndex + (limit || 20);
+      const paginatedSeekers = filteredSeekers.slice(startIndex, endIndex);
+
+      // Convert to Seeker instances
+      return paginatedSeekers.map(seekerData => new Seeker(seekerData));
+
+    } catch (error) {
+      console.error('Error getting seeker recommendations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save seeker for company user
+   */
+  static async saveSeekerForCompany(seekerId, companyUserId) {
+    try {
+      // Check if already saved
+      const existingSaved = await databaseService.query(
+        COLLECTIONS.SAVED_SEEKERS,
+        [
+          { field: 'seekerId', operator: '==', value: seekerId },
+          { field: 'companyUserId', operator: '==', value: companyUserId }
+        ]
+      );
+
+      if (existingSaved.length > 0) {
+        throw new Error('Seeker already saved');
+      }
+
+      // Save seeker
+      const savedSeekerData = {
+        seekerId: seekerId,
+        companyUserId: companyUserId,
+        savedAt: new Date().toISOString(),
+        isActive: true
+      };
+
+      const savedSeekerId = await databaseService.create(COLLECTIONS.SAVED_SEEKERS, savedSeekerData);
+      
+      return {
+        id: savedSeekerId,
+        ...savedSeekerData
+      };
+    } catch (error) {
+      console.error('Error saving seeker for company:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove saved seeker for company user
+   */
+  static async unsaveSeekerForCompany(seekerId, companyUserId) {
+    try {
+      // Find saved seeker
+      const savedSeekers = await databaseService.query(
+        COLLECTIONS.SAVED_SEEKERS,
+        [
+          { field: 'seekerId', operator: '==', value: seekerId },
+          { field: 'companyUserId', operator: '==', value: companyUserId }
+        ]
+      );
+
+      if (savedSeekers.length === 0) {
+        return false;
+      }
+
+      // Remove saved seeker
+      await databaseService.delete(COLLECTIONS.SAVED_SEEKERS, savedSeekers[0].id);
+      return true;
+    } catch (error) {
+      console.error('Error removing saved seeker for company:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get saved seekers for company user
+   */
+  static async getSavedSeekersForCompany(companyUserId, limit = 20, offset = 0) {
+    try {
+      // Get saved seeker entries
+      const savedSeekerEntries = await databaseService.query(
+        COLLECTIONS.SAVED_SEEKERS,
+        [
+          { field: 'companyUserId', operator: '==', value: companyUserId },
+          { field: 'isActive', operator: '==', value: true }
+        ]
+      );
+
+      const totalSeekers = savedSeekerEntries.length;
+      const paginatedEntries = savedSeekerEntries.slice(offset, offset + limit);
+
+      // Get seeker details for saved seekers
+      const seekers = [];
+      for (const entry of paginatedEntries) {
+        try {
+          const seekerData = await databaseService.getById(COLLECTIONS.SEEKERS, entry.seekerId);
+          if (seekerData) {
+            const seeker = new Seeker(seekerData);
+            // Add saved metadata
+            seekers.push({
+              ...seeker.toPublicJSON(),
+              savedAt: entry.savedAt,
+              savedId: entry.id
+            });
+          }
+        } catch (error) {
+          console.error('Error loading saved seeker details:', error);
+          // Continue with other seekers
+        }
+      }
+
+      return {
+        seekers: seekers,
+        totalSeekers: totalSeekers,
+        hasMore: (offset + limit) < totalSeekers
+      };
+    } catch (error) {
+      console.error('Error getting saved seekers for company:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if seeker is saved by company user
+   */
+  static async isSeekerSavedByCompany(seekerId, companyUserId) {
+    try {
+      const savedSeekers = await databaseService.query(
+        COLLECTIONS.SAVED_SEEKERS,
+        [
+          { field: 'seekerId', operator: '==', value: seekerId },
+          { field: 'companyUserId', operator: '==', value: companyUserId },
+          { field: 'isActive', operator: '==', value: true }
+        ]
+      );
+
+      return savedSeekers.length > 0;
+    } catch (error) {
+      console.error('Error checking if seeker is saved:', error);
+      return false;
+    }
   }
 }
 

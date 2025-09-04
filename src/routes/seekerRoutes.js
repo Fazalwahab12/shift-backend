@@ -144,6 +144,87 @@ router.get('/user/:userId', authenticateToken, [
 ], SeekerController.getProfileByUserId);
 
 /**
+ * @route   GET /api/seekers/recommendations
+ * @desc    Get seeker recommendations based on roles and skills
+ * @access  Public
+ */
+router.get('/recommendations', [
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('industries')
+    .optional()
+    .isString()
+    .withMessage('Industries must be a comma-separated string'),
+  query('locations')
+    .optional()
+    .isString()
+    .withMessage('Locations must be a comma-separated string'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], SeekerController.getSeekerRecommendations);
+
+/**
+ * @route   POST /api/seekers/:seekerId/save
+ * @desc    Save seeker for company user
+ * @access  Private (JWT Token Required - Company)
+ */
+router.post('/:seekerId/save', authenticateToken, [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.saveSeeker);
+
+/**
+ * @route   DELETE /api/seekers/:seekerId/unsave
+ * @desc    Remove saved seeker for company user
+ * @access  Private (JWT Token Required - Company)
+ */
+router.delete('/:seekerId/unsave', authenticateToken, [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.unsaveSeeker);
+
+/**
+ * @route   GET /api/seekers/saved
+ * @desc    Get saved seekers for company user
+ * @access  Private (JWT Token Required - Company)
+ */
+router.get('/saved', authenticateToken, [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], SeekerController.getSavedSeekers);
+
+/**
+ * @route   GET /api/seekers/:seekerId/is-saved
+ * @desc    Check if seeker is saved by company user
+ * @access  Private (JWT Token Required - Company)
+ */
+router.get('/:seekerId/is-saved', authenticateToken, [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required')
+], SeekerController.checkSeekerSaved);
+
+/**
  * @route   GET /api/seekers/:seekerId
  * @desc    Get seeker profile by ID
  * @access  Private (JWT Token Required)
@@ -736,5 +817,37 @@ router.get('/blocking-stats', authenticateToken, SeekerController.getBlockingSta
 router.get('/can-apply-to/:companyId', authenticateToken, [
   param('companyId').notEmpty().withMessage('Company ID is required')
 ], SeekerController.canApplyToCompany);
+
+/**
+ * @route   GET /api/seekers/recommendations
+ * @desc    Get seeker recommendations based on roles and skills
+ * @access  Public
+ */
+router.get('/recommendations', [
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('industries')
+    .optional()
+    .isString()
+    .withMessage('Industries must be a comma-separated string'),
+  query('locations')
+    .optional()
+    .isString()
+    .withMessage('Locations must be a comma-separated string'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], SeekerController.getSeekerRecommendations);
 
 module.exports = router;

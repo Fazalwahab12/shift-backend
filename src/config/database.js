@@ -19,7 +19,9 @@ const COLLECTIONS = {
   ROLES: 'roles',
   NOTIFICATIONS: 'notifications',
   EMAIL_HISTORY: 'email_history',
-  SAVED_JOBS: 'savedJobs'
+  SAVED_JOBS: 'savedJobs',
+  SAVED_SEEKERS: 'savedSeekers',
+  BRAND_FOLLOWS: 'brand_follows'
 };
 
 /**

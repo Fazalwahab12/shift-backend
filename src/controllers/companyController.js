@@ -2830,6 +2830,589 @@ class CompanyController {
       });
     }
   }
+
+  /**
+   * Get brand recommendations based on seeker skills and roles
+   * GET /api/companies/brands/recommendations
+   */
+  static async getBrandRecommendations(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can get brand recommendations'
+        });
+      }
+
+      const { roles, skills, limit = 20, offset = 0 } = req.query;
+
+      // Convert comma-separated strings to arrays
+      const roleArray = roles ? roles.split(',').map(r => r.trim()) : [];
+      const skillArray = skills ? skills.split(',').map(s => s.trim()) : [];
+
+      if (roleArray.length === 0 && skillArray.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'At least one role or skill must be provided for recommendations'
+        });
+      }
+
+      const Job = require('../models/Job');
+      const Company = require('../models/Company');
+
+      // Get all active jobs that match the skills/roles
+      const filters = {
+        jobStatus: 'published'
+      };
+
+      const matchingJobs = await Job.searchJobs(filters, parseInt(limit) * 3, parseInt(offset));
+
+      // Score and group jobs by brand
+      const brandScores = new Map();
+      
+      for (const job of matchingJobs) {
+        if (!job.brandName) continue;
+
+        let score = 0;
+        const jobRoles = job.roleName ? [job.roleName.toLowerCase()] : [];
+        const jobSkills = job.requiredSkills ? job.requiredSkills.map(s => s.toLowerCase()) : [];
+
+        // Score based on role match
+        for (const role of roleArray) {
+          if (jobRoles.some(jr => jr.includes(role.toLowerCase()) || role.toLowerCase().includes(jr))) {
+            score += 10; // High score for role match
+          }
+        }
+
+        // Score based on skill match
+        for (const skill of skillArray) {
+          if (jobSkills.some(js => js.includes(skill.toLowerCase()) || skill.toLowerCase().includes(js))) {
+            score += 5; // Medium score for skill match
+          }
+        }
+
+        if (score > 0) {
+          const brandKey = job.brandName;
+          if (!brandScores.has(brandKey)) {
+            brandScores.set(brandKey, {
+              brandName: job.brandName,
+              companyId: job.companyId,
+              companyName: job.companyName,
+              score: 0,
+              jobCount: 0,
+              recentJobsCount: 0,
+              governorates: new Set()
+            });
+          }
+
+          const brand = brandScores.get(brandKey);
+          brand.score += score;
+          brand.jobCount += 1;
+          
+          if (job.governorate) {
+            brand.governorates.add(job.governorate);
+          }
+
+          // Check for recent jobs (last 30 days)
+          const jobDate = new Date(job.publishedAt);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          if (jobDate > thirtyDaysAgo) {
+            brand.recentJobsCount += 1;
+          }
+        }
+      }
+
+      // Convert to array and get actual company locations
+      let brands = [];
+      
+      for (const brand of brandScores.values()) {
+        try {
+          // Get actual company locations for this brand
+          const Company = require('../models/Company');
+          
+          // Try both findByUserId and findById methods
+          let company = await Company.findByUserId(brand.companyId);
+          if (!company) {
+            company = await Company.findById(brand.companyId);
+          }
+          
+          let actualLocations = [];
+          let locationCount = 0;
+
+          if (company && company.locations && company.locations.length > 0) {
+            // Filter locations for this specific brand
+            actualLocations = company.locations.filter(location => {
+              return !location.brand || location.brand.toLowerCase() === brand.brandName.toLowerCase();
+            }).map(location => ({
+              address: location.address,
+              brand: location.brand || brand.brandName,
+              addedAt: location.addedAt
+            }));
+            
+            // If no brand-specific locations, use all company locations  
+            if (actualLocations.length === 0) {
+              actualLocations = company.locations.map(location => ({
+                address: location.address,
+                brand: location.brand || brand.brandName,
+                addedAt: location.addedAt
+              }));
+            }
+            
+            locationCount = actualLocations.length;
+          }
+
+          // Calculate activity score: job count + location count + recent activity bonus
+          const activityScore = (brand.jobCount * 2) + (locationCount * 3) + (brand.recentJobsCount * 5);
+          
+          brands.push({
+            brandId: `${brand.companyId}-${brand.brandName.replace(/\s+/g, '-').toLowerCase()}`,
+            brandName: brand.brandName,
+            companyId: brand.companyId,
+            companyName: brand.companyName,
+            matchScore: brand.score,
+            activityScore: activityScore,
+            jobCount: brand.jobCount,
+            locationCount: locationCount,
+            recentJobsCount: brand.recentJobsCount,
+            locations: actualLocations
+          });
+
+        } catch (error) {
+          console.error(`Error fetching company data for ${brand.companyId}:`, error);
+          
+          // Skip brands without valid company data - no fallback
+          console.log(`⚠️ Skipping brand ${brand.brandName} due to company data error`);
+          continue;
+        }
+      }
+
+      // Sort by combined score (match score + activity score)
+      brands.sort((a, b) => ((b.matchScore + b.activityScore) - (a.matchScore + a.activityScore)));
+
+      // Paginate results
+      const paginatedBrands = brands.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand recommendations retrieved successfully',
+        data: {
+          brands: paginatedBrands,
+          totalCount: brands.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: (parseInt(offset) + parseInt(limit)) < brands.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting brand recommendations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get brand recommendations',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Follow a brand
+   * POST /api/companies/brands/:brandId/follow
+   */
+  static async followBrand(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { brandId } = req.params;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can follow brands'
+        });
+      }
+
+      const BrandFollow = require('../models/BrandFollow');
+      const Job = require('../models/Job');
+
+      // Extract brand information from brandId
+      const brandName = brandId.split('-').slice(1).join(' ');
+      
+      // Get brand info from a job to get company details
+      const brandJobs = await Job.searchJobs({ 
+        jobStatus: 'published',
+        brandName: brandName 
+      }, 1, 0);
+
+      let companyId = null;
+      let companyName = null;
+      
+      if (brandJobs.length > 0) {
+        companyId = brandJobs[0].companyId;
+        companyName = brandJobs[0].companyName;
+      }
+
+      // Create follow record
+      const followData = {
+        seekerId: userId,
+        brandId: brandId,
+        companyId: companyId,
+        brandName: brandName,
+        companyName: companyName
+      };
+
+      const brandFollow = await BrandFollow.create(followData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand followed successfully',
+        data: { 
+          brandId,
+          followedAt: brandFollow.followedAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Error following brand:', error);
+      
+      if (error.message === 'Already following this brand') {
+        return res.status(400).json({
+          success: false,
+          message: 'You are already following this brand'
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to follow brand',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Unfollow a brand
+   * DELETE /api/companies/brands/:brandId/follow
+   */
+  static async unfollowBrand(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { brandId } = req.params;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can unfollow brands'
+        });
+      }
+
+      const BrandFollow = require('../models/BrandFollow');
+
+      // Unfollow the brand
+      await BrandFollow.unfollow(userId, brandId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand unfollowed successfully',
+        data: { brandId }
+      });
+
+    } catch (error) {
+      console.error('Error unfollowing brand:', error);
+      
+      if (error.message === 'Not following this brand') {
+        return res.status(404).json({
+          success: false,
+          message: 'You are not following this brand'
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Failed to unfollow brand',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get followed brands
+   * GET /api/companies/brands/followed
+   */
+  static async getFollowedBrands(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { limit = 50, offset = 0 } = req.query;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can get followed brands'
+        });
+      }
+
+      const BrandFollow = require('../models/BrandFollow');
+      const Job = require('../models/Job');
+
+      // Get followed brands using the model
+      const followedBrands = await BrandFollow.findBySeekerId(userId, {
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      });
+
+      // Enrich with brand data and activity scores
+      const enrichedBrands = [];
+      
+      for (const follow of followedBrands) {
+        // Get recent jobs for this brand to calculate activity
+        const brandJobs = await Job.searchJobs(
+          { 
+            jobStatus: 'published',
+            brandName: follow.brandName
+          },
+          50,
+          0
+        );
+
+        if (brandJobs.length > 0) {
+          const locationCount = new Set(brandJobs.filter(j => j.governorate).map(j => j.governorate)).size;
+          const recentJobsCount = brandJobs.filter(job => {
+            const jobDate = new Date(job.publishedAt);
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            return jobDate > thirtyDaysAgo;
+          }).length;
+
+          const activityScore = (brandJobs.length * 2) + (locationCount * 3) + (recentJobsCount * 5);
+
+          enrichedBrands.push({
+            brandId: follow.brandId,
+            brandName: follow.brandName,
+            companyId: follow.companyId,
+            companyName: follow.companyName,
+            followedAt: follow.followedAt,
+            activityScore: activityScore,
+            jobCount: brandJobs.length,
+            locationCount: locationCount,
+            recentJobsCount: recentJobsCount
+          });
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Followed brands retrieved successfully',
+        data: {
+          brands: enrichedBrands,
+          totalCount: followedBrands.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset)
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting followed brands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get followed brands',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get brand jobs matching seeker's skills/roles
+   * GET /api/companies/brands/:brandId/jobs
+   */
+  static async getBrandJobs(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { brandId } = req.params;
+      const { roles, skills, limit = 20, offset = 0 } = req.query;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can get brand jobs'
+        });
+      }
+
+      const Job = require('../models/Job');
+
+      // Extract brand name from brandId
+      const brandName = brandId.split('-').slice(1).join(' ');
+
+      const filters = {
+        jobStatus: 'published',
+        brandName: brandName
+      };
+
+      // Get jobs for this brand
+      const brandJobs = await Job.searchJobs(filters, parseInt(limit), parseInt(offset));
+
+      // If roles or skills provided, filter and score the jobs
+      if (roles || skills) {
+        const roleArray = roles ? roles.split(',').map(r => r.trim()) : [];
+        const skillArray = skills ? skills.split(',').map(s => s.trim()) : [];
+
+        const scoredJobs = brandJobs.map(job => {
+          let matchScore = 0;
+          const jobRoles = job.roleName ? [job.roleName.toLowerCase()] : [];
+          const jobSkills = job.requiredSkills ? job.requiredSkills.map(s => s.toLowerCase()) : [];
+
+          // Score based on role match
+          for (const role of roleArray) {
+            if (jobRoles.some(jr => jr.includes(role.toLowerCase()) || role.toLowerCase().includes(jr))) {
+              matchScore += 10;
+            }
+          }
+
+          // Score based on skill match
+          for (const skill of skillArray) {
+            if (jobSkills.some(js => js.includes(skill.toLowerCase()) || skill.toLowerCase().includes(js))) {
+              matchScore += 5;
+            }
+          }
+
+          return { ...job, matchScore };
+        }).filter(job => job.matchScore > 0)
+          .sort((a, b) => b.matchScore - a.matchScore);
+        
+        brandJobs = scoredJobs;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand jobs retrieved successfully',
+        data: {
+          brandId: brandId,
+          brandName: brandName,
+          jobs: brandJobs,
+          totalCount: brandJobs.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: false
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting brand jobs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get brand jobs',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get brand details with activity score and metrics
+   * GET /api/companies/brands/:brandId/details
+   */
+  static async getBrandDetails(req, res) {
+    try {
+      const { brandId } = req.params;
+
+      const Job = require('../models/Job');
+
+      // Extract brand name from brandId
+      const brandName = brandId.split('-').slice(1).join(' ');
+
+      // Get all jobs for this brand
+      const brandJobs = await Job.searchJobs(
+        { 
+          jobStatus: 'published',
+          brandName: brandName
+        },
+        1000, // Get all jobs for accurate metrics
+        0
+      );
+
+      if (brandJobs.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Brand not found or has no active jobs'
+        });
+      }
+
+      const firstJob = brandJobs[0];
+      
+      // Calculate metrics
+      const locationCount = new Set(brandJobs.filter(j => j.governorate).map(j => j.governorate)).size;
+      const locations = Array.from(new Set(brandJobs.filter(j => j.governorate).map(j => j.governorate)));
+      
+      const recentJobsCount = brandJobs.filter(job => {
+        const jobDate = new Date(job.publishedAt);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return jobDate > thirtyDaysAgo;
+      }).length;
+
+      // Calculate activity score
+      const activityScore = (brandJobs.length * 2) + (locationCount * 3) + (recentJobsCount * 5);
+
+      // Get top roles and skills
+      const roleCount = {};
+      const skillCount = {};
+
+      brandJobs.forEach(job => {
+        if (job.roleName) {
+          roleCount[job.roleName] = (roleCount[job.roleName] || 0) + 1;
+        }
+        if (job.requiredSkills) {
+          job.requiredSkills.forEach(skill => {
+            skillCount[skill] = (skillCount[skill] || 0) + 1;
+          });
+        }
+      });
+
+      const topRoles = Object.entries(roleCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([role, count]) => ({ role, count }));
+
+      const topSkills = Object.entries(skillCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([skill, count]) => ({ skill, count }));
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand details retrieved successfully',
+        data: {
+          brandId: brandId,
+          brandName: firstJob.brandName,
+          companyId: firstJob.companyId,
+          companyName: firstJob.companyName,
+          activityScore: activityScore,
+          metrics: {
+            totalJobs: brandJobs.length,
+            activeJobs: brandJobs.length,
+            locationCount: locationCount,
+            recentJobsCount: recentJobsCount
+          },
+          locations: locations,
+          topRoles: topRoles,
+          topSkills: topSkills,
+          recentJobs: brandJobs.slice(0, 5) // Show 5 most recent jobs
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting brand details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get brand details',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = CompanyController;

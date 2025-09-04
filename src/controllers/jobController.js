@@ -281,7 +281,6 @@ class JobController {
         
         // Location filters
         governorate: req.query.governorate,
-        wilayat: req.query.wilayat,
         
         // Job type filters
         roles: req.query.roles ? req.query.roles.split(',').map(r => r.trim()) : null,
@@ -874,6 +873,134 @@ class JobController {
       res.status(500).json({
         success: false,
         message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get all active brands with activity scores
+   * GET /api/jobs/brands
+   */
+  static async getAllBrands(req, res) {
+    try {
+      const { limit = 50, offset = 0, sortBy = 'activityScore', sortOrder = 'desc' } = req.query;
+
+      const Job = require('../models/Job');
+
+      // Get all published jobs
+      const allJobs = await Job.searchJobs(
+        { jobStatus: 'published' },
+        parseInt(limit) * 10, // Get more jobs to ensure we capture all brands
+        0
+      );
+
+      // Group jobs by brand and calculate metrics
+      const brandMetrics = new Map();
+
+      for (const job of allJobs) {
+        if (!job.brandName) continue;
+
+        const brandKey = job.brandName;
+        if (!brandMetrics.has(brandKey)) {
+          brandMetrics.set(brandKey, {
+            brandName: job.brandName,
+            companyId: job.companyId,
+            companyName: job.companyName,
+            jobCount: 0,
+            locationCount: 0,
+            recentJobsCount: 0,
+            governorates: new Set(),
+            totalJobs: 0,
+            latestJobDate: null
+          });
+        }
+
+        const brand = brandMetrics.get(brandKey);
+        brand.totalJobs += 1;
+        brand.jobCount += 1;
+
+        if (job.governorate) {
+          brand.governorates.add(job.governorate);
+        }
+
+        // Check for recent jobs (last 30 days)
+        const jobDate = new Date(job.publishedAt);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (jobDate > thirtyDaysAgo) {
+          brand.recentJobsCount += 1;
+        }
+
+        // Track latest job date
+        if (!brand.latestJobDate || jobDate > new Date(brand.latestJobDate)) {
+          brand.latestJobDate = job.publishedAt;
+        }
+      }
+
+      // Convert to array and calculate activity scores
+      let brands = Array.from(brandMetrics.values()).map(brand => {
+        const locationCount = brand.governorates.size;
+        // Activity score formula: (jobCount * 2) + (locationCount * 3) + (recentJobs * 5)
+        const activityScore = (brand.jobCount * 2) + (locationCount * 3) + (brand.recentJobsCount * 5);
+
+        return {
+          brandId: `${brand.companyId}-${brand.brandName.replace(/\s+/g, '-').toLowerCase()}`,
+          brandName: brand.brandName,
+          companyId: brand.companyId,
+          companyName: brand.companyName,
+          activityScore: activityScore,
+          jobCount: brand.jobCount,
+          locationCount: locationCount,
+          recentJobsCount: brand.recentJobsCount,
+          locations: Array.from(brand.governorates),
+          latestJobDate: brand.latestJobDate
+        };
+      });
+
+      // Sort brands
+      const sortField = sortBy;
+      const isDescending = sortOrder === 'desc';
+
+      brands.sort((a, b) => {
+        let aVal = a[sortField];
+        let bVal = b[sortField];
+
+        // Handle string sorting for name
+        if (sortField === 'name') {
+          aVal = a.brandName;
+          bVal = b.brandName;
+        }
+
+        if (typeof aVal === 'string') {
+          return isDescending ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+        } else {
+          return isDescending ? bVal - aVal : aVal - bVal;
+        }
+      });
+
+      // Paginate results
+      const paginatedBrands = brands.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
+
+      res.status(200).json({
+        success: true,
+        message: 'Brands retrieved successfully',
+        data: {
+          brands: paginatedBrands,
+          totalCount: brands.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: (parseInt(offset) + parseInt(limit)) < brands.length,
+          sortBy: sortBy,
+          sortOrder: sortOrder
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting all brands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get brands',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

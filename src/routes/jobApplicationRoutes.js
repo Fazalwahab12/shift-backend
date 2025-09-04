@@ -36,6 +36,13 @@ router.post('/jobs/:jobId/apply', [
 ], JobApplicationController.applyToJob);
 
 /**
+ * @route   GET /api/jobs/:jobId/application-status
+ * @desc    Check if seeker has applied to a job
+ * @access  Private (Seeker)
+ */
+router.get('/jobs/:jobId/application-status', JobApplicationController.checkApplicationStatus);
+
+/**
  * @route   GET /api/jobs/:jobId/applications
  * @desc    Get job applications for a job (company view)
  * @access  Private (Company)
