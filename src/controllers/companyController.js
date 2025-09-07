@@ -3413,6 +3413,135 @@ class CompanyController {
       });
     }
   }
+
+  /**
+   * Check interview limits and current usage
+   * GET /api/companies/:companyId/interview-limits
+   */
+  static async checkInterviewLimits(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array()
+        });
+      }
+
+      const { companyId } = req.params;
+      const userId = req.user.userId;
+
+      // Get company profile
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Verify ownership
+      if (company.userId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Get plan limits using the company method
+      const planLimits = company.getPlanLimits();
+      const currentUsage = company.usageStats || {};
+
+      // Calculate current interviews used
+      const interviewsUsed = currentUsage.interviews || 0;
+      const interviewsLimit = planLimits.interviews || 0;
+
+      // Get current plan info from company subscription data
+      let currentPlan = company.subscriptionPlan || 'trial';
+      
+      // Handle different plan representations
+      if (company.planType) {
+        currentPlan = company.planType;
+      } else if (company.subscriptionType) {
+        currentPlan = company.subscriptionType;
+      }
+
+      // Normalize plan names
+      if (currentPlan === 'pay-as-you-go' || currentPlan === 'pay_as_you_go') {
+        currentPlan = 'payg';
+      }
+
+      console.log('Plan check:', {
+        currentPlan,
+        subscriptionPlan: company.subscriptionPlan,
+        planType: company.planType,
+        subscriptionType: company.subscriptionType,
+        interviewsLimit,
+        interviewsUsed
+      });
+
+      // Check if can create interview based on plan type and limits
+      let canCreateInterview = false;
+      let message = null;
+
+      // Handle interview limits based on plan type
+      if (interviewsLimit === 'unlimited') {
+        // Unlimited interviews (trial, custom plans)
+        canCreateInterview = true;
+      } else if (typeof interviewsLimit === 'number') {
+        if (interviewsLimit === 0) {
+          // No interviews allowed on this plan
+          canCreateInterview = false;
+          if (currentPlan === 'payg') {
+            message = 'Interviews not available on Pay-As-You-Go plan. Please upgrade to access interview features.';
+          } else {
+            message = 'Interviews not available on your current plan. Please upgrade to access interview features.';
+          }
+        } else if (interviewsLimit === -1) {
+          // Unlimited interviews (represented as -1)
+          canCreateInterview = true;
+        } else {
+          // Check if under limit
+          canCreateInterview = interviewsUsed < interviewsLimit;
+          if (!canCreateInterview) {
+            message = `You have reached your interview limit of ${interviewsLimit} for this billing period.`;
+          }
+        }
+      } else {
+        // Default case - allow interviews
+        canCreateInterview = true;
+      }
+
+      // Prepare response
+      const response = {
+        canCreateInterview,
+        currentPlan,
+        interviewsUsed,
+        interviewsLimit: (interviewsLimit === -1 || interviewsLimit === 'unlimited') ? 'unlimited' : interviewsLimit
+      };
+
+      if (message) {
+        response.message = message;
+      }
+
+      console.log('Interview limits response:', response);
+
+      res.json({
+        success: true,
+        message: 'Interview limits retrieved successfully',
+        data: response
+      });
+
+    } catch (error) {
+      console.error('Error checking interview limits:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check interview limits',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = CompanyController;

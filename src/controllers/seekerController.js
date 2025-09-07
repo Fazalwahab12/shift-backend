@@ -668,6 +668,57 @@ class SeekerController {
   }
 
   /**
+   * Upload video URL/path (Admin only)
+   * POST /api/seekers/:seekerId/upload-video
+   */
+  static async uploadVideoUrl(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { videoUrl, notes } = req.body;
+
+      const seeker = await Seeker.findById(seekerId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Update seeker with video URL and notes
+      const updateData = {
+        videoUrl: videoUrl,
+        videoRecordedAt: new Date().toISOString(),
+        videoStatus: 'recorded'
+      };
+
+      if (notes) {
+        updateData.videoNotes = notes;
+      }
+
+      await seeker.update(updateData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Video URL uploaded successfully',
+        data: {
+          videoUrl: seeker.videoUrl,
+          videoStatus: seeker.videoStatus,
+          videoRecordedAt: seeker.videoRecordedAt,
+          videoNotes: seeker.videoNotes
+        }
+      });
+
+    } catch (error) {
+      console.error('Error in uploadVideoUrl:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
    * Publish video (Admin only)
    * POST /api/seekers/:seekerId/publish-video
    */

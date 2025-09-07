@@ -26,6 +26,7 @@ class Job {
     // Instant Hire Fields
     this.jobDuration = data.jobDuration || null; // Duration selection
     this.shiftTypes = data.shiftTypes || []; // ['Morning', 'Afternoon', 'Evening', 'Night']
+    this.shiftTimeRanges = data.shiftTimeRanges || []; // Array of {shiftType: 'Evening', startTime: '17:00', endTime: '21:00'}
     this.startDate = data.startDate || null; // Start date
     this.startTime = data.startTime || null; // Start time
     this.hoursPerDay = data.hoursPerDay || null; // Number of hours per day
@@ -33,8 +34,7 @@ class Job {
     this.paymentTerms = data.paymentTerms || null; // 'Within 1 Week' | 'Within 15 Days' | 'Within 30 Days'
     
     // Interview First Fields
-    this.interviewDate = data.interviewDate || null; // Optional interview date
-    this.interviewTime = data.interviewTime || null; // Optional interview time
+    this.interviewAvailability = data.interviewAvailability || []; // Array of availability slots: [{fromDate, fromTime, toDate, toTime}]
     this.interviewDuration = data.interviewDuration || null; // Interview duration (15 min, 30 min, etc.)
     this.interviewLocation = data.interviewLocation || null; // Optional interview location
     this.interviewLanguages = data.interviewLanguages || ['English', 'Arabic']; // Interview languages
@@ -285,13 +285,13 @@ class Job {
       hiringType: this.hiringType,
       jobDuration: this.jobDuration,
       shiftTypes: this.shiftTypes,
+      shiftTimeRanges: this.shiftTimeRanges,
       startDate: this.startDate,
       startTime: this.startTime,
       hoursPerDay: this.hoursPerDay,
       payPerHour: this.payPerHour,
       paymentTerms: this.paymentTerms,
-      interviewDate: this.interviewDate,
-      interviewTime: this.interviewTime,
+      interviewAvailability: this.interviewAvailability,
       interviewLocation: this.interviewLocation,
       interviewLanguages: this.interviewLanguages,
       workType: this.workType,
@@ -334,6 +334,7 @@ class Job {
       jobSummary: this.jobSummary,
       hiringType: this.hiringType,
       shiftTypes: this.shiftTypes,
+      shiftTimeRanges: this.shiftTimeRanges,
       startDate: this.startDate,
       startTime: this.startTime,
       hoursPerDay: this.hoursPerDay,
@@ -386,16 +387,57 @@ class Job {
    */
   static async findByJobId(jobId) {
     try {
-      const jobs = await databaseService.query(
-        COLLECTIONS.JOBS,
-        [
-          { field: 'jobId', operator: '==', value: jobId },
-          { field: 'isActive', operator: '==', value: true }
-        ]
-      );
-      return jobs.length > 0 ? new Job(jobs[0]) : null;
+      console.log(`🔍 Searching for job with jobId: ${jobId}`);
+      
+      // Try different approaches to find the job
+      let job = null;
+      
+      // Method 1: Simple query by jobId only
+      try {
+        const jobs = await databaseService.query(
+          COLLECTIONS.JOBS,
+          [{ field: 'jobId', operator: '==', value: jobId }]
+        );
+        
+        console.log(`🔍 Method 1 - Simple query: Found ${jobs.length} jobs`);
+        
+        if (jobs.length > 0) {
+          job = jobs[0];
+          console.log(`🔍 Job found via simple query:`, {
+            jobId: job.jobId,
+            isActive: job.isActive,
+            jobStatus: job.jobStatus,
+            companyId: job.companyId,
+            userId: job.userId,
+            roleName: job.roleName
+          });
+        }
+      } catch (queryError) {
+        console.error('❌ Simple query failed:', queryError);
+      }
+      
+      // Method 2: If simple query fails, try getById if jobId looks like an ID
+      if (!job && (jobId.length > 10)) {
+        try {
+          console.log(`🔍 Method 2 - Trying getById with: ${jobId}`);
+          const directJob = await databaseService.getById(COLLECTIONS.JOBS, jobId);
+          if (directJob) {
+            job = directJob;
+            console.log(`🔍 Job found via getById:`, {
+              id: job.id,
+              jobId: job.jobId,
+              companyId: job.companyId,
+              roleName: job.roleName
+            });
+          }
+        } catch (getByIdError) {
+          console.error('❌ getById failed:', getByIdError.message);
+        }
+      }
+      
+      return job ? new Job(job) : null;
     } catch (error) {
-      console.error('Error finding job by jobId:', error);
+      console.error('❌ Error finding job by jobId:', error);
       throw error;
     }
   }

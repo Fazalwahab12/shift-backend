@@ -1330,6 +1330,17 @@ router.get('/brands/:brandId/jobs', authenticateToken, [
 ], CompanyController.getBrandJobs);
 
 /**
+ * @route   GET /api/companies/:companyId/interview-limits
+ * @desc    Check interview limits and current usage for company
+ * @access  Private (JWT Token Required)
+ */
+router.get('/:companyId/interview-limits', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required')
+], CompanyController.checkInterviewLimits);
+
+/**
  * @route   GET /api/companies/brands/:brandId/details
  * @desc    Get brand details with activity score and metrics
  * @access  Public

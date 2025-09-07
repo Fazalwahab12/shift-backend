@@ -23,6 +23,7 @@ class Seeker {
     
     // VIDEO MANAGEMENT SYSTEM
     this.profileVideo = data.profileVideo || null; // Final video URL (set by admin)
+    this.videoUrl = data.videoUrl || null; // Admin uploaded video URL/path
     this.videoStatus = data.videoStatus || 'pending'; // 'pending', 'scheduled', 'recorded', 'published', 'rejected'
     this.videoRequestedAt = data.videoRequestedAt || null; // When user requested video
     this.videoScheduledAt = data.videoScheduledAt || null; // When admin scheduled recording
@@ -997,6 +998,7 @@ class Seeker {
       
       // Video Management System
       profileVideo: this.profileVideo,
+      videoUrl: this.videoUrl,
       videoStatus: this.videoStatus,
       videoRequestedAt: this.videoRequestedAt,
       videoScheduledAt: this.videoScheduledAt,
@@ -1084,6 +1086,7 @@ class Seeker {
       email: this.email,
       profilePhoto: this.profilePhoto && !this.profilePhoto.includes('placeholder-storage.com') ? this.profilePhoto : null,
       profileVideo: this.profileVideo, // Only show if published
+      videoUrl: this.videoUrl, // Admin uploaded video URL
       bio: this.bio,
       educationalLevel: this.educationalLevel,
       videoWorkflow: this.getVideoWorkflowStatus(), // Include video workflow status

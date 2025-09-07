@@ -16,11 +16,14 @@ class JobApplication {
     this.seekerId = data.seekerId || null;
     this.companyId = data.companyId || null;
     
+    // POPULATED DATA - Complete seeker, job, and company information
+    this.seekerData = data.seekerData || null;
+    this.jobData = data.jobData || null;
+    this.companyData = data.companyData || null;
+    
     // Application details
     this.status = data.status || 'applied'; // 'applied', 'invited', 'interviewed', 'hired', 'declined', 'withdrawn'
     this.applicationSource = data.applicationSource || 'applied'; // 'applied', 'invited'
-    this.coverLetter = data.coverLetter || null; // Not used as per requirements
-    this.expectedSalary = data.expectedSalary || null;
     this.availability = data.availability || null;
     
     // Decline/rejection details
@@ -78,9 +81,144 @@ class JobApplication {
   }
 
   /**
-   * Create new job application
+   * Populate application with complete seeker, job, and company data
    */
-  static async create(applicationData) {
+  async populateData() {
+    try {
+      console.log(`🔍 PopulateData - Application ID: ${this.id}, SeekerId: ${this.seekerId}, Has seekerData: ${!!this.seekerData}`);
+      
+      // Get seeker data
+      if (this.seekerId && !this.seekerData) {
+        const Seeker = require('./Seeker');
+        console.log(`🔍 PopulateData - Looking up seeker by document ID: ${this.seekerId}`);
+        // Note: seekerId should now be the seeker document ID
+        const seeker = await Seeker.findById(this.seekerId);
+        console.log(`🔍 PopulateData - Seeker found:`, seeker ? { id: seeker.id, userId: seeker.userId, fullName: seeker.fullName } : 'Not found');
+        
+        if (seeker) {
+          this.seekerData = {
+            id: seeker.id,
+            userId: seeker.userId,
+            fullName: seeker.fullName,
+            email: seeker.email,
+            mobileNumber: seeker.mobileNumber,
+            profilePhoto: seeker.profilePhoto,
+            profileVideo: seeker.profileVideo,
+            bio: seeker.bio,
+            educationalLevel: seeker.educationalLevel,
+            industries: seeker.industries,
+            roles: seeker.roles,
+            yearsOfExperience: seeker.yearsOfExperience,
+            skills: seeker.skills,
+            previousWorkplaces: seeker.previousWorkplaces,
+            availability: seeker.availability,
+            currentStatus: seeker.currentStatus,
+            workType: seeker.workType,
+            preferredLocations: seeker.preferredLocations,
+            languages: seeker.languages,
+            averageRating: seeker.averageRating,
+            activityScore: seeker.activityScore,
+            totalJobsAppliedTo: seeker.totalJobsAppliedTo,
+            numberOfHires: seeker.numberOfHires,
+            numberOfInterviews: seeker.numberOfInterviews,
+            isVerified: seeker.isVerified,
+            registrationDate: seeker.registrationDate,
+            lastActiveDate: seeker.lastActiveDate
+          };
+        }
+      }
+
+      // Get job data
+      if (this.jobId && !this.jobData) {
+        const Job = require('./Job');
+        const job = await Job.findByJobId(this.jobId);
+        if (job) {
+          this.jobData = {
+            id: job.id,
+            jobId: job.jobId,
+            roleName: job.roleName,
+            jobSummary: job.jobSummary,
+            jobCoverImage: job.jobCoverImage,
+            hiringType: job.hiringType,
+            payPerHour: job.payPerHour,
+            hoursPerDay: job.hoursPerDay,
+            shiftTypes: job.shiftTypes,
+            shiftTimeRanges: job.shiftTimeRanges,
+            startDate: job.startDate,
+            startTime: job.startTime,
+            requiredSkills: job.requiredSkills,
+            requiredLanguages: job.requiredLanguages,
+            genderPreference: job.genderPreference,
+            jobPerks: job.jobPerks,
+            dressCode: job.dressCode,
+            workType: job.workType,
+            interviewAvailability: job.interviewAvailability,
+            interviewDuration: job.interviewDuration,
+            interviewLocation: job.interviewLocation,
+            interviewLanguages: job.interviewLanguages,
+            locationAddress: job.locationAddress,
+            governorate: job.governorate,
+            jobStatus: job.jobStatus,
+            publishedAt: job.publishedAt,
+            applicationsCount: job.applicationsCount,
+            viewsCount: job.viewsCount,
+            brandLocationId: job.brandLocationId
+          };
+        }
+      }
+
+      // Get company data
+      if (this.companyId && !this.companyData) {
+        const Company = require('./Company');
+        const company = await Company.findById(this.companyId);
+        if (company) {
+          // Find the specific location if brandLocationId is available
+          let locationData = null;
+          if (this.jobData && this.jobData.brandLocationId && company.locations) {
+            locationData = company.locations.find(loc => loc.id === this.jobData.brandLocationId);
+          }
+
+          this.companyData = {
+            id: company.id,
+            companyName: company.companyName,
+            companyLogo: company.companyLogo,
+            companyDescription: company.companyDescription,
+            industryType: company.industryType,
+            companySize: company.companySize,
+            website: company.website,
+            establishedYear: company.establishedYear,
+            licenseNumber: company.licenseNumber,
+            contactEmail: company.contactEmail,
+            contactPhone: company.contactPhone,
+            subscriptionPlan: company.subscriptionPlan,
+            isVerified: company.isVerified,
+            rating: company.averageRating,
+            totalJobs: company.totalJobsPosted,
+            activeJobs: company.activeJobsCount,
+            locationData: locationData ? {
+              id: locationData.id,
+              brand: locationData.brand,
+              address: locationData.address,
+              governorate: locationData.governorate,
+              wilayat: locationData.wilayat,
+              contactPerson: locationData.contactPerson,
+              contactPhone: locationData.contactPhone
+            } : null
+          };
+        }
+      }
+
+      return this;
+    } catch (error) {
+      console.error('Error populating application data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create new job application with full data population
+   */
+  static async create(applicationData, req = null) {
     try {
       // Check if seeker is blocked by company
       await JobApplication.checkSeekerBlocked(applicationData.companyId, applicationData.seekerId);
@@ -92,11 +230,31 @@ class JobApplication {
       
       const application = new JobApplication(applicationData);
       
+      // Populate with complete data
+      await application.populateData();
+      
       // Save to database
       const result = await databaseService.create(COLLECTIONS.JOB_APPLICATIONS, application.toJSON());
-      application.id = result.insertedId;
+      application.id = result.insertedId || result.id;
       
-      // Send notification to company (implement as needed)
+      // Track history
+      const ApplicationHistory = require('./ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: application.id,
+        jobId: application.jobId,
+        seekerId: application.seekerId,
+        companyId: application.companyId,
+        action: applicationData.applicationSource === 'invited' ? 'invited' : 'applied',
+        fromStatus: null,
+        toStatus: application.status,
+        actionBy: applicationData.applicationSource === 'invited' ? 'company' : 'seeker',
+        actionById: applicationData.actionById || (req?.user?.userId),
+        notes: 'Application created',
+        ipAddress: req?.ip,
+        userAgent: req?.get('User-Agent')
+      });
+      
+      // Send notification to company
       await JobApplication.notifyCompanyOfApplication(application);
       
       return application;
@@ -107,12 +265,38 @@ class JobApplication {
   }
 
   /**
-   * Find application by ID
+   * Find application by ID with populated data
    */
   static async findById(applicationId) {
     try {
+      console.log(`🔍 JobApplication.findById - Searching for ID: ${applicationId}`);
       const data = await databaseService.getById(COLLECTIONS.JOB_APPLICATIONS, applicationId);
-      return data ? new JobApplication(data) : null;
+      
+      if (!data) {
+        console.log(`🔍 JobApplication.findById - No data found for ID: ${applicationId}`);
+        return null;
+      }
+      
+      console.log(`🔍 JobApplication.findById - Raw data from database:`, {
+        id: data.id,
+        applicationId: data.applicationId,
+        hasId: data.hasOwnProperty('id'),
+        idType: typeof data.id
+      });
+      
+      // CRITICAL FIX: Ensure the document ID is properly set
+      // The applicationId parameter IS the document ID we need
+      data.id = applicationId;
+      
+      const application = new JobApplication(data);
+      console.log(`🔍 JobApplication.findById - After constructor with ID fix:`, {
+        id: application.id,
+        applicationId: application.applicationId
+      });
+      
+      await application.populateData();
+      
+      return application;
     } catch (error) {
       console.error('Error finding job application:', error);
       throw new Error('Failed to find job application');
@@ -120,7 +304,7 @@ class JobApplication {
   }
 
   /**
-   * Find applications by job ID
+   * Find applications by job ID with populated data
    */
   static async findByJobId(jobId, options = {}) {
     try {
@@ -137,7 +321,26 @@ class JobApplication {
         options.limit || 50
       );
       
-      return applications.map(app => new JobApplication(app));
+      console.log(`🔍 JobApplication.findByJobId - Query returned ${applications.length} applications`);
+      
+      // Populate data for all applications
+      const populatedApplications = [];
+      for (const appData of applications) {
+        console.log(`🔍 JobApplication.findByJobId - Raw appData ID: ${appData.id}, type: ${typeof appData.id}`);
+        
+        // CRITICAL FIX: Ensure document ID is always set
+        if (!appData.id) {
+          console.error(`❌ Missing ID in application data:`, appData);
+        }
+        
+        const app = new JobApplication(appData);
+        console.log(`🔍 JobApplication.findByJobId - After constructor ID: ${app.id}`);
+        
+        await app.populateData();
+        populatedApplications.push(app);
+      }
+      
+      return populatedApplications;
     } catch (error) {
       console.error('Error finding job applications:', error);
       throw new Error('Failed to find job applications');
@@ -145,7 +348,7 @@ class JobApplication {
   }
 
   /**
-   * Find applications by seeker ID
+   * Find applications by seeker ID with populated data
    */
   static async findBySeekerId(seekerId, options = {}) {
     try {
@@ -159,6 +362,10 @@ class JobApplication {
         filters.push({ field: 'jobId', operator: '==', value: options.jobId });
       }
       
+      if (options.companyId) {
+        filters.push({ field: 'companyId', operator: '==', value: options.companyId });
+      }
+      
       const applications = await databaseService.query(
         COLLECTIONS.JOB_APPLICATIONS, 
         filters,
@@ -166,7 +373,24 @@ class JobApplication {
         options.limit || 50
       );
       
-      return applications.map(app => new JobApplication(app));
+      // Populate data for all applications
+      const populatedApplications = [];
+      for (const appData of applications) {
+        console.log(`🔍 JobApplication.findBySeekerId - Raw appData ID: ${appData.id}, type: ${typeof appData.id}`);
+        
+        // CRITICAL FIX: Ensure document ID is always set
+        if (!appData.id) {
+          console.error(`❌ Missing ID in application data:`, appData);
+        }
+        
+        const app = new JobApplication(appData);
+        console.log(`🔍 JobApplication.findBySeekerId - After constructor ID: ${app.id}`);
+        
+        await app.populateData();
+        populatedApplications.push(app);
+      }
+      
+      return populatedApplications;
     } catch (error) {
       console.error('Error finding seeker applications:', error);
       throw new Error('Failed to find seeker applications');
@@ -174,10 +398,12 @@ class JobApplication {
   }
 
   /**
-   * Accept job application - TRIGGER CHAT CREATION
+   * Accept job application with history tracking
    */
-  async accept() {
+  async accept(req = null) {
     try {
+      const previousStatus = this.status;
+      
       // Update application status
       this.status = 'accepted';
       this.statusChangedAt = new Date().toISOString();
@@ -199,7 +425,7 @@ class JobApplication {
           this.companyId,
           this.seekerId,
           this.jobId,
-          this.jobTitle || 'Job Application'
+          this.jobData?.roleName || this.jobTitle || 'Job Application'
         );
 
         // Update application with chat info
@@ -218,11 +444,29 @@ class JobApplication {
         // Send welcome message
         await Chat.sendSystemMessage(
           chat.id,
-          `🎉 Congratulations! Your application for "${this.jobTitle}" has been accepted. You can now chat with the employer.`
+          `🎉 Congratulations! Your application for "${this.jobData?.roleName || this.jobTitle}" has been accepted. You can now chat with the employer.`
         );
 
         console.log(`✅ Chat created for accepted application: ${this.applicationId}`);
       }
+
+      // Track history
+      const ApplicationHistory = require('./ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: this.id,
+        jobId: this.jobId,
+        seekerId: this.seekerId,
+        companyId: this.companyId,
+        action: 'accepted',
+        fromStatus: previousStatus,
+        toStatus: this.status,
+        actionBy: 'company',
+        actionById: req?.user?.userId,
+        notes: 'Application accepted and chat initiated',
+        metadata: { chatId: this.chatId, chatInitiated: this.chatInitiated },
+        ipAddress: req?.ip,
+        userAgent: req?.get('User-Agent')
+      });
 
       return this;
     } catch (error) {
@@ -232,10 +476,12 @@ class JobApplication {
   }
 
   /**
-   * Decline job application with specific reasons
+   * Decline job application with specific reasons and history tracking
    */
-  async decline(reason = 'Another candidate selected') {
+  async decline(reason = 'Another candidate selected', req = null) {
     try {
+      const previousStatus = this.status;
+      
       const validReasons = [
         'Another candidate selected',
         'Not the right fit', 
@@ -264,6 +510,24 @@ class JobApplication {
           updatedAt: this.updatedAt
         }
       );
+
+      // Track history
+      const ApplicationHistory = require('./ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: this.id,
+        jobId: this.jobId,
+        seekerId: this.seekerId,
+        companyId: this.companyId,
+        action: 'declined',
+        fromStatus: previousStatus,
+        toStatus: this.status,
+        actionBy: 'company',
+        actionById: req?.user?.userId,
+        reason: reason,
+        notes: `Application declined: ${reason}`,
+        ipAddress: req?.ip,
+        userAgent: req?.get('User-Agent')
+      });
 
       // Send decline notification
       await JobApplication.notifySeekerOfDecline(this, reason);
@@ -302,6 +566,96 @@ class JobApplication {
           updatedAt: this.updatedAt
         }
       );
+
+      // Send hire request notification
+      await JobApplication.notifySeekerOfHireRequest(this);
+      
+      return this;
+    } catch (error) {
+      console.error('Error sending hire request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send hire request to seeker (alias for hireNow to match controller naming)
+   */
+  async sendHireRequest() {
+    try {
+      const previousStatus = this.status;
+      
+      // Validate workflow - hiring available for both job types
+      if (this.status !== 'applied' && this.status !== 'interviewed') {
+        throw new Error('Application must be in applied or interviewed status to hire');
+      }
+
+      this.status = 'hired';
+      this.hireStatus = 'pending';
+      this.hireRequestedAt = new Date().toISOString();
+      this.statusChangedAt = new Date().toISOString();
+      this.updatedAt = new Date().toISOString();
+      
+      await databaseService.update(
+        COLLECTIONS.JOB_APPLICATIONS,
+        this.id,
+        {
+          status: this.status,
+          hireStatus: this.hireStatus,
+          hireRequestedAt: this.hireRequestedAt,
+          statusChangedAt: this.statusChangedAt,
+          updatedAt: this.updatedAt
+        }
+      );
+
+      // Create chat room for hired application
+      if (!this.chatInitiated) {
+        const Chat = require('./Chat');
+        const chat = await Chat.create(
+          this.companyId,
+          this.seekerId,
+          this.jobId,
+          this.jobData?.roleName || this.jobTitle || 'Job Application'
+        );
+
+        // Update application with chat info
+        this.chatId = chat.id;
+        this.chatInitiated = true;
+        
+        await databaseService.update(
+          COLLECTIONS.JOB_APPLICATIONS,
+          this.id,
+          {
+            chatId: this.chatId,
+            chatInitiated: this.chatInitiated
+          }
+        );
+
+        // Send welcome message
+        await Chat.sendSystemMessage(
+          chat.id,
+          `🎉 Congratulations! You've been hired for "${this.jobData?.roleName || this.jobTitle}". You can now chat with the employer about next steps.`
+        );
+
+        console.log(`✅ Chat created for hired application: ${this.applicationId}`);
+      }
+
+      // Track history
+      const ApplicationHistory = require('./ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: this.id,
+        jobId: this.jobId,
+        seekerId: this.seekerId,
+        companyId: this.companyId,
+        action: 'hired',
+        fromStatus: previousStatus,
+        toStatus: this.status,
+        actionBy: 'company',
+        actionById: null, // Will be set by controller
+        notes: 'Hire request sent to seeker',
+        metadata: { chatId: this.chatId, chatInitiated: this.chatInitiated },
+        ipAddress: null, // Will be set by controller
+        userAgent: null // Will be set by controller
+      });
 
       // Send hire request notification
       await JobApplication.notifySeekerOfHireRequest(this);
@@ -818,31 +1172,61 @@ class JobApplication {
   }
 
   /**
-   * Convert to JSON
+   * Convert to JSON with populated data
    */
   toJSON() {
+    console.log(`🔍 toJSON - Application ${this.id}: seekerData exists: ${!!this.seekerData}, seeker fullName: ${this.seekerData?.fullName}`);
+    
     return {
+      // Basic application info
       id: this.id,
       applicationId: this.applicationId,
       jobId: this.jobId,
       seekerId: this.seekerId,
       companyId: this.companyId,
       status: this.status,
-      coverLetter: this.coverLetter,
-      expectedSalary: this.expectedSalary,
+      applicationSource: this.applicationSource,
       availability: this.availability,
+      
+      // POPULATED DATA - This is the key improvement!
+      seeker: this.seekerData,
+      job: this.jobData,
+      company: this.companyData,
+      
+      // Legacy fields (for backward compatibility)
       jobTitle: this.jobTitle,
       jobType: this.jobType,
       companyName: this.companyName,
       seekerName: this.seekerName,
       seekerPhone: this.seekerPhone,
       seekerEmail: this.seekerEmail,
+      
+      // Workflow fields
+      declineReason: this.declineReason,
+      declinedAt: this.declinedAt,
+      hireStatus: this.hireStatus,
+      hireRequestedAt: this.hireRequestedAt,
+      hireRespondedAt: this.hireRespondedAt,
+      hireResponse: this.hireResponse,
+      reportingEnabled: this.reportingEnabled,
+      reportHistory: this.reportHistory,
+      
+      // Interview data
       interviewScheduled: this.interviewScheduled,
       interviewDate: this.interviewDate,
       interviewTime: this.interviewTime,
+      interviewDuration: this.interviewDuration,
+      interviewEndTime: this.interviewEndTime,
       interviewStatus: this.interviewStatus,
+      interviewType: this.interviewType,
+      interviewLocation: this.interviewLocation,
+      interviewNotes: this.interviewNotes,
+      
+      // Communication
       chatId: this.chatId,
       chatInitiated: this.chatInitiated,
+      
+      // Timestamps
       appliedAt: this.appliedAt,
       reviewedAt: this.reviewedAt,
       statusChangedAt: this.statusChangedAt,

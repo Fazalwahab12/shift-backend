@@ -1,4 +1,5 @@
 const { validationResult } = require('express-validator');
+const { databaseService, COLLECTIONS } = require('../config/database');
 const JobApplication = require('../models/JobApplication');
 const Job = require('../models/Job');
 const Chat = require('../models/Chat');
@@ -25,7 +26,7 @@ class JobApplicationController {
 
       const { jobId } = req.params;
       const { userId, userType } = req.user;
-      const { coverLetter, expectedSalary, availability } = req.body;
+      const { availability } = req.body;
 
       // Verify user is a seeker
       if (userType !== 'seeker') {
@@ -51,8 +52,18 @@ class JobApplicationController {
         });
       }
 
-      // Check if already applied
-      const existingApplication = await JobApplication.findBySeekerId(userId, { jobId });
+      // Get seeker document to ensure it exists and get the proper document ID
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Check if already applied (using seeker document ID)
+      const existingApplication = await JobApplication.findBySeekerId(seeker.id, { jobId });
       if (existingApplication.length > 0) {
         return res.status(400).json({
           success: false,
@@ -60,20 +71,19 @@ class JobApplicationController {
         });
       }
 
-      // Create application
+      // Create application (use seeker document ID instead of user ID)
       const applicationData = {
         jobId: job.jobId,
-        seekerId: userId,
+        seekerId: seeker.id,  // Use seeker document ID, not user ID
         companyId: job.companyId,
-        coverLetter,
-        expectedSalary,
         availability,
         jobTitle: job.roleName,
         companyName: job.companyName,
-        hiringType: job.hiringType
+        hiringType: job.hiringType,
+        actionById: userId
       };
 
-      const application = await JobApplication.create(applicationData);
+      const application = await JobApplication.create(applicationData, req);
       
       // Increment the job's applications count
       await job.incrementApplications();
@@ -113,10 +123,28 @@ class JobApplicationController {
       }
 
       const job = await Job.findByJobId(jobId);
-      if (!job || job.companyId !== userId) {
+      
+      if (!job) {
         return res.status(404).json({
           success: false,
-          message: 'Job not found or access denied'
+          message: 'Job not found'
+        });
+      }
+
+      // Check if company owns this job (can be either companyId or userId)
+      const hasAccess = job.companyId === userId || job.userId === userId;
+      
+      console.log(`🔍 Access Check for Applications - CompanyId: ${job.companyId}, UserId: ${job.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied - you can only view applications for your own jobs',
+          debug: {
+            jobCompanyId: job.companyId,
+            jobUserId: job.userId,
+            requestUserId: userId
+          }
         });
       }
 
@@ -229,7 +257,7 @@ class JobApplicationController {
       }
 
       // Accept application - this triggers chat creation
-      await application.accept();
+      await application.accept(req);
       
       res.status(200).json({
         success: true,
@@ -338,76 +366,28 @@ class JobApplicationController {
         });
       }
 
-      // Verify company owns the job
-      if (application.companyId !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied to this application'
-        });
-      }
-
-      await application.decline(reason);
+      // Get the job to check ownership (same logic as hire method)
+      const Job = require('../models/Job');
+      const job = await Job.findByJobId(application.jobId);
       
-      res.status(200).json({
-        success: true,
-        message: 'Application declined successfully',
-        data: application.toJSON()
-      });
-
-    } catch (error) {
-      console.error('Error declining application:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to decline application',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  }
-
-  /**
-   * Decline job application with specific reasons
-   * PUT /api/applications/:applicationId/decline
-   */
-  static async declineApplication(req, res) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-
-      const { applicationId } = req.params;
-      const { userId, userType } = req.user;
-      const { reason } = req.body;
-
-      // Verify user is a company
-      if (userType !== 'company') {
+      // Check if company owns this application (can be either companyId or userId)
+      const hasAccess = application.companyId === userId || job?.userId === userId;
+      
+      console.log(`🔍 Decline Access Check - App CompanyId: ${application.companyId}, Job CompanyId: ${job?.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
-          message: 'Only companies can decline applications'
+          message: 'Access denied - you can only decline applications for your own jobs',
+          debug: {
+            applicationCompanyId: application.companyId,
+            jobUserId: job?.userId,
+            requestUserId: userId
+          }
         });
       }
 
-      const application = await JobApplication.findById(applicationId);
-      if (!application) {
-        return res.status(404).json({
-          success: false,
-          message: 'Application not found'
-        });
-      }
-
-      // Verify company owns the job
-      if (application.companyId !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied to this application'
-        });
-      }
-
-      await application.decline(reason);
+      await application.decline(reason, req);
       
       res.status(200).json({
         success: true,
@@ -431,8 +411,13 @@ class JobApplicationController {
    */
   static async sendHireRequest(req, res) {
     try {
-      const { applicationId } = req.params;
+      let { applicationId } = req.params;
       const { userId, userType } = req.user;
+
+      // Clean parameter - remove any colon prefix
+      applicationId = applicationId.startsWith(':') ? applicationId.substring(1) : applicationId;
+
+      console.log(`🔍 Hire Request Debug - ApplicationId: ${applicationId}, CompanyUserId: ${userId}, UserType: ${userType}`);
 
       // Verify user is a company
       if (userType !== 'company') {
@@ -442,19 +427,71 @@ class JobApplicationController {
         });
       }
 
-      const application = await JobApplication.findById(applicationId);
+      // Try to find application by applicationId field first (more likely scenario)
+      console.log(`🔍 Searching for application by applicationId field: ${applicationId}`);
+      const applications = await databaseService.query(
+        COLLECTIONS.JOB_APPLICATIONS,
+        [{ field: 'applicationId', operator: '==', value: applicationId }]
+      );
+      
+      let application;
+      if (applications.length > 0) {
+        application = new JobApplication(applications[0]);
+        // Ensure the document ID is properly set
+        application.id = applications[0].id;
+        await application.populateData();
+        console.log(`🔍 Application found by applicationId field:`, {
+          id: application.id,
+          applicationId: application.applicationId,
+          status: application.status,
+          seekerId: application.seekerId,
+          companyId: application.companyId
+        });
+      } else {
+        console.log(`🔍 Application not found by applicationId field, trying by document ID...`);
+        // Fallback: try finding by document ID
+        application = await JobApplication.findById(applicationId);
+        
+        if (application) {
+          console.log(`🔍 Application found by document ID:`, {
+            id: application.id,
+            applicationId: application.applicationId,
+            status: application.status,
+            seekerId: application.seekerId,
+            companyId: application.companyId
+          });
+        }
+      }
+
       if (!application) {
         return res.status(404).json({
           success: false,
-          message: 'Application not found'
+          message: 'Application not found',
+          debug: {
+            searchedId: applicationId,
+            note: 'Tried both document ID and applicationId field'
+          }
         });
       }
 
-      // Verify company owns the job
-      if (application.companyId !== userId) {
+      // Get the job to check ownership
+      const Job = require('../models/Job');
+      const job = await Job.findByJobId(application.jobId);
+      
+      // Check if company owns this application (can be either companyId or userId)
+      const hasAccess = application.companyId === userId || job?.userId === userId;
+      
+      console.log(`🔍 Hire Access Check - App CompanyId: ${application.companyId}, Job CompanyId: ${job?.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
-          message: 'Access denied to this application'
+          message: 'Access denied - you can only hire for your own jobs',
+          debug: {
+            applicationCompanyId: application.companyId,
+            jobUserId: application.jobData?.userId,
+            requestUserId: userId
+          }
         });
       }
 
@@ -658,8 +695,14 @@ class JobApplicationController {
    */
   static async inviteSeeker(req, res) {
     try {
-      const { jobId, seekerId } = req.params;
+      let { jobId, seekerId } = req.params;
       const { userId, userType } = req.user;
+
+      // Clean parameters - remove any colon prefix
+      jobId = jobId.startsWith(':') ? jobId.substring(1) : jobId;
+      seekerId = seekerId.startsWith(':') ? seekerId.substring(1) : seekerId;
+
+      console.log(`🔍 Invite Debug - JobId: ${jobId}, SeekerId: ${seekerId}, CompanyUserId: ${userId}, UserType: ${userType}`);
 
       // Verify user is a company
       if (userType !== 'company') {
@@ -672,10 +715,41 @@ class JobApplicationController {
       // Get job details
       const job = await Job.findByJobId(jobId);
       
-      if (!job || job.userId !== userId) {
+      console.log(`🔍 Job found:`, job ? {
+        id: job.id,
+        jobId: job.jobId,
+        companyId: job.companyId,
+        userId: job.userId,
+        jobStatus: job.jobStatus,
+        isActive: job.isActive,
+        roleName: job.roleName
+      } : 'No job found');
+      
+      if (!job) {
         return res.status(404).json({
           success: false,
-          message: 'Job not found or access denied'
+          message: 'Job not found',
+          debug: {
+            searchedJobId: jobId,
+            note: 'Job may not exist or isActive=false'
+          }
+        });
+      }
+
+      // Check if company owns this job (can be either companyId or userId)
+      const hasAccess = job.companyId === userId || job.userId === userId;
+      
+      console.log(`🔍 Access Check - CompanyId: ${job.companyId}, UserId: ${job.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied - you can only invite seekers to your own jobs',
+          debug: {
+            jobCompanyId: job.companyId,
+            jobUserId: job.userId,
+            requestUserId: userId
+          }
         });
       }
 
@@ -695,10 +769,13 @@ class JobApplicationController {
         companyId: job.companyId,
         jobTitle: job.roleName,
         companyName: job.companyName,
-        status: 'invited'
+        hiringType: job.hiringType,
+        status: 'invited',
+        applicationSource: 'invited',
+        actionById: userId
       };
 
-      const application = await JobApplication.create(applicationData);
+      const application = await JobApplication.create(applicationData, req);
       
       // Increment the job's applications count
       await job.incrementApplications();
@@ -1210,6 +1287,281 @@ class JobApplicationController {
       res.status(500).json({
         success: false,
         message: 'Failed to retrieve application',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Complete job (mark as completed)
+   * PUT /api/applications/:applicationId/complete
+   */
+  static async completeJob(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { feedback, rating, notes } = req.body;
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Both company and seeker can mark as completed
+      const hasAccess = (userType === 'company' && application.companyId === userId) ||
+                       (userType === 'seeker' && application.seekerId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      if (application.status !== 'hired') {
+        return res.status(400).json({
+          success: false,
+          message: 'Only hired applications can be completed'
+        });
+      }
+
+      const previousStatus = application.status;
+      
+      application.status = 'completed';
+      application.statusChangedAt = new Date().toISOString();
+      application.updatedAt = new Date().toISOString();
+
+      await databaseService.update(
+        COLLECTIONS.JOB_APPLICATIONS,
+        application.id,
+        {
+          status: application.status,
+          statusChangedAt: application.statusChangedAt,
+          updatedAt: application.updatedAt
+        }
+      );
+
+      // Track history
+      const ApplicationHistory = require('../models/ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: application.id,
+        jobId: application.jobId,
+        seekerId: application.seekerId,
+        companyId: application.companyId,
+        action: 'completed',
+        fromStatus: previousStatus,
+        toStatus: application.status,
+        actionBy: userType,
+        actionById: userId,
+        notes: notes || 'Job marked as completed',
+        metadata: { feedback, rating },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Job completed successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error completing job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to complete job',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Cancel job (mark as cancelled)  
+   * PUT /api/applications/:applicationId/cancel
+   */
+  static async cancelJob(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { reason, notes } = req.body;
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Both company and seeker can cancel
+      const hasAccess = (userType === 'company' && application.companyId === userId) ||
+                       (userType === 'seeker' && application.seekerId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      const previousStatus = application.status;
+      
+      application.status = 'cancelled';
+      application.declineReason = reason;
+      application.statusChangedAt = new Date().toISOString();
+      application.updatedAt = new Date().toISOString();
+
+      await databaseService.update(
+        COLLECTIONS.JOB_APPLICATIONS,
+        application.id,
+        {
+          status: application.status,
+          declineReason: application.declineReason,
+          statusChangedAt: application.statusChangedAt,
+          updatedAt: application.updatedAt
+        }
+      );
+
+      // Track history
+      const ApplicationHistory = require('../models/ApplicationHistory');
+      await ApplicationHistory.trackAction({
+        applicationId: application.id,
+        jobId: application.jobId,
+        seekerId: application.seekerId,
+        companyId: application.companyId,
+        action: 'cancelled',
+        fromStatus: previousStatus,
+        toStatus: application.status,
+        actionBy: userType,
+        actionById: userId,
+        reason: reason,
+        notes: notes || 'Job cancelled',
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Job cancelled successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error cancelling job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to cancel job',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get applications for a specific seeker (company view)
+   * GET /api/seekers/:seekerId/applications
+   */
+  static async getSeekerApplicationsForCompany(req, res) {
+    try {
+      const { seekerId } = req.params;
+      const { userId, userType } = req.user;
+
+      console.log(`🔍 getSeekerApplicationsForCompany - SeekerId: ${seekerId}, CompanyUserId: ${userId}`);
+
+      // Verify user is company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can view seeker applications'
+        });
+      }
+
+      // Get ALL applications for this seeker (not just for current company)
+      console.log(`🔍 Looking for applications where seekerId=${seekerId}`);
+      const applications = await JobApplication.findBySeekerId(seekerId);
+      
+      console.log(`🔍 Found ${applications.length} total applications for seeker ${seekerId}`);
+      
+      // Filter applications that belong to jobs owned by the current company user
+      const companyApplications = [];
+      for (const app of applications) {
+        if (app.jobData && (app.jobData.userId === userId || app.companyId === userId)) {
+          companyApplications.push(app);
+        }
+      }
+      
+      console.log(`🔍 Found ${companyApplications.length} applications for seeker ${seekerId} with company user ${userId}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Seeker applications retrieved successfully',
+        data: {
+          applications: applications.map(app => app.toJSON())
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting seeker applications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve seeker applications',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Check if seeker has application for specific job
+   * GET /api/jobs/:jobId/seekers/:seekerId/application
+   */
+  static async getSeekerJobApplication(req, res) {
+    try {
+      const { jobId, seekerId } = req.params;
+      const { userId, userType } = req.user;
+
+      console.log(`🔍 getSeekerJobApplication - JobId: ${jobId}, SeekerId: ${seekerId}, CompanyUserId: ${userId}`);
+
+      // Verify user is company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can view seeker applications'
+        });
+      }
+
+      // Check if seeker applied to this specific job
+      const applications = await JobApplication.findBySeekerId(seekerId, { jobId });
+      
+      console.log(`🔍 Found ${applications.length} applications for seeker ${seekerId} on job ${jobId}`);
+
+      if (applications.length > 0) {
+        const application = applications[0]; // Get the application
+        res.status(200).json({
+          success: true,
+          message: 'Seeker application found',
+          data: {
+            hasApplication: true,
+            application: application.toJSON()
+          }
+        });
+      } else {
+        res.status(200).json({
+          success: true,
+          message: 'No application found',
+          data: {
+            hasApplication: false,
+            application: null
+          }
+        });
+      }
+
+    } catch (error) {
+      console.error('Error checking seeker job application:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check seeker application',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

@@ -10,7 +10,9 @@ const COLLECTIONS = {
   JOBS: 'jobs',
   APPLICATIONS: 'applications',
   JOB_APPLICATIONS: 'job_applications',
+  APPLICATION_HISTORY: 'application_history',
   INTERVIEWS: 'interviews',
+  INSTANT_HIRES: 'instant_hires',
   CHATS: 'chats',
   MESSAGES: 'messages',
   PHONE_REGISTRATIONS: 'phone_registrations',
@@ -168,10 +170,13 @@ class DatabaseService {
    */
   async query(collectionName, filters = [], orderBy = null, limit = null) {
     try {
+      console.log(`🔍 DB Query - Collection: ${collectionName}, Filters:`, filters);
+      
       let query = this.collection(collectionName);
       
       // Apply filters
       filters.forEach(filter => {
+        console.log(`🔍 Applying filter: ${filter.field} ${filter.operator} ${filter.value}`);
         query = query.where(filter.field, filter.operator, filter.value);
       });
       
@@ -186,13 +191,42 @@ class DatabaseService {
       }
       
       const snapshot = await query.get();
+      console.log(`🔍 DB Query Result: Found ${snapshot.docs.length} documents`);
       
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const results = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          id: doc.id  // Ensure document ID always takes precedence
+        };
+      });
+      
+      // Show first result for debugging
+      if (results.length > 0 && collectionName === 'jobs') {
+        console.log(`🔍 First job result:`, {
+          id: results[0].id,
+          jobId: results[0].jobId,
+          companyId: results[0].companyId,
+          userId: results[0].userId,
+          isActive: results[0].isActive,
+          jobStatus: results[0].jobStatus
+        });
+      }
+      
+      // Show first result for job applications debugging
+      if (results.length > 0 && collectionName === 'job_applications') {
+        console.log(`🔍 First job application result:`, {
+          id: results[0].id,
+          applicationId: results[0].applicationId,
+          jobId: results[0].jobId,
+          seekerId: results[0].seekerId,
+          status: results[0].status
+        });
+      }
+      
+      return results;
     } catch (error) {
-      console.error(`Error querying ${collectionName}:`, error);
+      console.error(`❌ Error querying ${collectionName}:`, error);
       throw error;
     }
   }

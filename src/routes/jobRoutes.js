@@ -89,6 +89,22 @@ router.put('/:jobId/step/:step', authenticateToken, [
     .optional()
     .isIn(['Morning', 'Afternoon', 'Evening', 'Night'])
     .withMessage('Invalid shift type'),
+  body('shiftTimeRanges')
+    .optional()
+    .isArray()
+    .withMessage('Shift time ranges must be an array'),
+  body('shiftTimeRanges.*.shiftType')
+    .optional()
+    .isIn(['Morning', 'Afternoon', 'Evening', 'Night'])
+    .withMessage('Invalid shift type in time range'),
+  body('shiftTimeRanges.*.startTime')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('Start time must be in HH:MM format'),
+  body('shiftTimeRanges.*.endTime')
+    .optional()
+    .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
+    .withMessage('End time must be in HH:MM format'),
   body('hoursPerDay')
     .optional()
     .isInt({ min: 1, max: 24 })

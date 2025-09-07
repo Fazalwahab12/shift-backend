@@ -19,15 +19,6 @@ router.use(authenticateToken);
  * @access  Private (Seeker)
  */
 router.post('/jobs/:jobId/apply', [
-  body('coverLetter')
-    .optional()
-    .isString()
-    .isLength({ max: 1000 })
-    .withMessage('Cover letter must be a string with max 1000 characters'),
-  body('expectedSalary')
-    .optional()
-    .isNumeric()
-    .withMessage('Expected salary must be a number'),
   body('availability')
     .optional()
     .isString()
@@ -62,6 +53,20 @@ router.get('/applications', JobApplicationController.getSeekerApplications);
  * @access  Private
  */
 router.get('/applications/:applicationId', JobApplicationController.getApplicationById);
+
+/**
+ * @route   GET /api/seekers/:seekerId/applications
+ * @desc    Get applications for a specific seeker (company view)
+ * @access  Private (Company)
+ */
+router.get('/seekers/:seekerId/applications', JobApplicationController.getSeekerApplicationsForCompany);
+
+/**
+ * @route   GET /api/jobs/:jobId/seekers/:seekerId/application
+ * @desc    Check if seeker has application for specific job
+ * @access  Private (Company)
+ */
+router.get('/jobs/:jobId/seekers/:seekerId/application', JobApplicationController.getSeekerJobApplication);
 
 /**
  * @route   PUT /api/applications/:applicationId/accept
@@ -246,5 +251,45 @@ router.put('/applications/:applicationId/block-seeker', [
     .isLength({ min: 5, max: 500 })
     .withMessage('Block reason is required and must be between 5 and 500 characters')
 ], JobApplicationController.blockSeekerFromApplication);
+
+/**
+ * @route   PUT /api/applications/:applicationId/complete
+ * @desc    Complete job (mark as completed)
+ * @access  Private (Company or Seeker)
+ */
+router.put('/applications/:applicationId/complete', [
+  body('feedback')
+    .optional()
+    .isString()
+    .isLength({ max: 500 })
+    .withMessage('Feedback must be a string with max 500 characters'),
+  body('rating')
+    .optional()
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be between 1 and 5'),
+  body('notes')
+    .optional()
+    .isString()
+    .isLength({ max: 300 })
+    .withMessage('Notes must be a string with max 300 characters')
+], JobApplicationController.completeJob);
+
+/**
+ * @route   PUT /api/applications/:applicationId/cancel
+ * @desc    Cancel job (mark as cancelled)
+ * @access  Private (Company or Seeker)
+ */
+router.put('/applications/:applicationId/cancel', [
+  body('reason')
+    .notEmpty()
+    .isString()
+    .isLength({ min: 5, max: 200 })
+    .withMessage('Cancellation reason is required and must be between 5-200 characters'),
+  body('notes')
+    .optional()
+    .isString()
+    .isLength({ max: 300 })
+    .withMessage('Notes must be a string with max 300 characters')
+], JobApplicationController.cancelJob);
 
 module.exports = router;

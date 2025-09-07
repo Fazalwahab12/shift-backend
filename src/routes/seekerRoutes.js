@@ -517,6 +517,26 @@ router.post('/:seekerId/mark-video-recorded', authenticateToken, [
 ], SeekerController.markVideoRecorded);
 
 /**
+ * @route   POST /api/seekers/:seekerId/upload-video
+ * @desc    Upload video URL/path (Admin only)
+ * @access  Private (JWT Token Required - Admin)
+ */
+router.post('/:seekerId/upload-video', authenticateToken, [
+  param('seekerId')
+    .notEmpty()
+    .withMessage('Seeker ID is required'),
+  body('videoUrl')
+    .notEmpty()
+    .withMessage('Video URL is required')
+    .isURL()
+    .withMessage('Video URL must be a valid URL'),
+  body('notes')
+    .optional()
+    .isLength({ max: 500 })
+    .withMessage('Notes must be less than 500 characters')
+], SeekerController.uploadVideoUrl);
+
+/**
  * @route   POST /api/seekers/:seekerId/publish-video
  * @desc    Publish video (Admin only)
  * @access  Private (JWT Token Required - Admin)
