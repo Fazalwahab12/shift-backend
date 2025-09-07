@@ -196,6 +196,16 @@ class JobApplicationController {
         });
       }
 
+      // Get seeker document to ensure it exists and get the proper document ID
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
       const options = {
         limit: parseInt(limit),
         offset: parseInt(offset)
@@ -205,7 +215,8 @@ class JobApplicationController {
         options.status = status;
       }
 
-      const applications = await JobApplication.findBySeekerId(userId, options);
+      // Use seeker document ID instead of user ID
+      const applications = await JobApplication.findBySeekerId(seeker.id, options);
       
       res.status(200).json({
         success: true,
@@ -599,11 +610,24 @@ class JobApplicationController {
         });
       }
 
-      // Verify company owns the job
-      if (application.companyId !== userId) {
+      // Get the job to check ownership (same logic as hire and decline methods)
+      const Job = require('../models/Job');
+      const job = await Job.findByJobId(application.jobId);
+      
+      // Check if company owns this application (can be either companyId or userId)
+      const hasAccess = application.companyId === userId || job?.userId === userId;
+      
+      console.log(`🔍 Interview Access Check - App CompanyId: ${application.companyId}, Job CompanyId: ${job?.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
+      
+      if (!hasAccess) {
         return res.status(403).json({
           success: false,
-          message: 'Access denied to this application'
+          message: 'Access denied - you can only schedule interviews for your own jobs',
+          debug: {
+            applicationCompanyId: application.companyId,
+            jobUserId: job?.userId,
+            requestUserId: userId
+          }
         });
       }
 
@@ -655,8 +679,18 @@ class JobApplicationController {
         });
       }
 
+      // Get seeker document to verify ownership
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
       // Verify seeker owns the application
-      if (application.seekerId !== userId) {
+      if (application.seekerId !== seeker.id) {
         return res.status(403).json({
           success: false,
           message: 'Access denied to this application'
@@ -821,8 +855,18 @@ class JobApplicationController {
         });
       }
 
+      // Get seeker document to verify ownership
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
       // Verify seeker owns the application
-      if (application.seekerId !== userId) {
+      if (application.seekerId !== seeker.id) {
         return res.status(403).json({
           success: false,
           message: 'Access denied to this application'
@@ -873,8 +917,18 @@ class JobApplicationController {
         });
       }
 
+      // Get seeker document to verify ownership
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
       // Verify seeker owns the application
-      if (application.seekerId !== userId) {
+      if (application.seekerId !== seeker.id) {
         return res.status(403).json({
           success: false,
           message: 'Access denied to this application'
@@ -1220,8 +1274,18 @@ class JobApplicationController {
         });
       }
 
-      // Check if application exists
-      const applications = await JobApplication.findBySeekerId(userId, { jobId });
+      // Get seeker document to ensure it exists and get the proper document ID
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Check if application exists using seeker document ID
+      const applications = await JobApplication.findBySeekerId(seeker.id, { jobId });
       const hasApplied = applications.length > 0;
       
       let applicationData = null;
@@ -1265,9 +1329,23 @@ class JobApplicationController {
         });
       }
 
-      // Verify user has access to this application
-      const hasAccess = (userType === 'company' && application.companyId === userId) ||
-                       (userType === 'seeker' && application.seekerId === userId);
+      let hasAccess = false;
+
+      // For companies, check if they own the job
+      if (userType === 'company') {
+        const Job = require('../models/Job');
+        const job = await Job.findByJobId(application.jobId);
+        hasAccess = application.companyId === userId || job?.userId === userId;
+      }
+      
+      // For seekers, get seeker document and compare with application.seekerId
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          hasAccess = application.seekerId === seeker.id;
+        }
+      }
       
       if (!hasAccess) {
         return res.status(403).json({
@@ -1311,8 +1389,19 @@ class JobApplicationController {
       }
 
       // Both company and seeker can mark as completed
-      const hasAccess = (userType === 'company' && application.companyId === userId) ||
-                       (userType === 'seeker' && application.seekerId === userId);
+      let hasAccess = false;
+
+      if (userType === 'company') {
+        const Job = require('../models/Job');
+        const job = await Job.findByJobId(application.jobId);
+        hasAccess = application.companyId === userId || job?.userId === userId;
+      } else if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          hasAccess = application.seekerId === seeker.id;
+        }
+      }
       
       if (!hasAccess) {
         return res.status(403).json({
@@ -1397,8 +1486,19 @@ class JobApplicationController {
       }
 
       // Both company and seeker can cancel
-      const hasAccess = (userType === 'company' && application.companyId === userId) ||
-                       (userType === 'seeker' && application.seekerId === userId);
+      let hasAccess = false;
+
+      if (userType === 'company') {
+        const Job = require('../models/Job');
+        const job = await Job.findByJobId(application.jobId);
+        hasAccess = application.companyId === userId || job?.userId === userId;
+      } else if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          hasAccess = application.seekerId === seeker.id;
+        }
+      }
       
       if (!hasAccess) {
         return res.status(403).json({
