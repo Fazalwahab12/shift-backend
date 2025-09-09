@@ -15,7 +15,33 @@ class ChatController {
     try {
       const { userId, userType } = req.user; // From auth middleware
       
-      const chats = await Chat.findByUserId(userId, userType);
+      console.log(`🔍 Getting chats for user: ${userId}, type: ${userType}`);
+
+      // Get the actual seeker/company ID for this user
+      let actualUserId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualUserId = seeker.id;
+          console.log(`🔄 Found seeker ID: ${actualUserId} for user: ${userId}`);
+        } else {
+          console.warn(`⚠️ No seeker found for user: ${userId}`);
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualUserId = company.id;
+          console.log(`🔄 Found company ID: ${actualUserId} for user: ${userId}`);
+        } else {
+          console.warn(`⚠️ No company found for user: ${userId}`);
+        }
+      }
+      
+      const chats = await Chat.findByUserId(actualUserId, userType);
+      console.log(`📨 Found ${chats.length} chats for ${userType} ID: ${actualUserId}`);
       
       // Disable caching for dynamic data
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -47,6 +73,27 @@ class ChatController {
       const { chatId } = req.params;
       const { userId, userType } = req.user;
       
+      console.log(`🔍 Getting chat ${chatId} for user: ${userId}, type: ${userType}`);
+
+      // Get the actual seeker/company ID for this user
+      let actualUserId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualUserId = seeker.id;
+          console.log(`🔄 Found seeker ID: ${actualUserId} for user: ${userId}`);
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualUserId = company.id;
+          console.log(`🔄 Found company ID: ${actualUserId} for user: ${userId}`);
+        }
+      }
+      
       const chat = await Chat.findById(chatId);
       if (!chat) {
         return res.status(404).json({
@@ -55,19 +102,24 @@ class ChatController {
         });
       }
 
-      // Verify user has access to this chat
-      const hasAccess = (userType === 'company' && chat.companyId === userId) ||
-                       (userType === 'seeker' && chat.seekerId === userId);
+      console.log(`🔒 Checking access: user=${actualUserId}, chat.companyId=${chat.companyId}, chat.seekerId=${chat.seekerId}`);
+
+      // Verify user has access to this chat using the mapped ID
+      const hasAccess = (userType === 'company' && chat.companyId === actualUserId) ||
+                       (userType === 'seeker' && chat.seekerId === actualUserId);
       
       if (!hasAccess) {
+        console.log(`❌ Access denied: ${userType} ${actualUserId} cannot access chat with companyId=${chat.companyId}, seekerId=${chat.seekerId}`);
         return res.status(403).json({
           success: false,
           message: 'Access denied to this chat'
         });
       }
 
-      // Mark messages as read
-      await Chat.markAsRead(chatId, userId, userType);
+      console.log(`✅ Access granted for ${userType} ${actualUserId}`);
+
+      // Mark messages as read using the mapped ID
+      await Chat.markAsRead(chatId, actualUserId, userType);
       
       res.status(200).json({
         success: true,
@@ -95,6 +147,25 @@ class ChatController {
       const { userId, userType } = req.user;
       const { limit = 50, lastTimestamp } = req.query;
       
+      console.log(`💬 Getting messages for chat ${chatId}, user: ${userId}, type: ${userType}`);
+
+      // Get the actual seeker/company ID for this user
+      let actualUserId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualUserId = seeker.id;
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualUserId = company.id;
+        }
+      }
+      
       // Verify user has access to this chat
       const chat = await Chat.findById(chatId);
       if (!chat) {
@@ -104,15 +175,19 @@ class ChatController {
         });
       }
 
-      const hasAccess = (userType === 'company' && chat.companyId === userId) ||
-                       (userType === 'seeker' && chat.seekerId === userId);
+      // Use the mapped ID for authorization check
+      const hasAccess = (userType === 'company' && chat.companyId === actualUserId) ||
+                       (userType === 'seeker' && chat.seekerId === actualUserId);
       
       if (!hasAccess) {
+        console.log(`❌ Message access denied: ${userType} ${actualUserId} cannot access chat with companyId=${chat.companyId}, seekerId=${chat.seekerId}`);
         return res.status(403).json({
           success: false,
           message: 'Access denied to this chat'
         });
       }
+
+      console.log(`✅ Message access granted for ${userType} ${actualUserId}`);
 
       const messages = await Chat.getMessages(chatId, parseInt(limit), lastTimestamp);
       
@@ -156,6 +231,25 @@ class ChatController {
       const { userId, userType } = req.user;
       const { messageText, messageType = 'text' } = req.body;
       
+      console.log(`📤 Sending message to chat ${chatId}, user: ${userId}, type: ${userType}`);
+
+      // Get the actual seeker/company ID for this user
+      let actualUserId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualUserId = seeker.id;
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualUserId = company.id;
+        }
+      }
+      
       // Verify user has access to this chat
       const chat = await Chat.findById(chatId);
       if (!chat) {
@@ -165,10 +259,12 @@ class ChatController {
         });
       }
 
-      const hasAccess = (userType === 'company' && chat.companyId === userId) ||
-                       (userType === 'seeker' && chat.seekerId === userId);
+      // Use the mapped ID for authorization check
+      const hasAccess = (userType === 'company' && chat.companyId === actualUserId) ||
+                       (userType === 'seeker' && chat.seekerId === actualUserId);
       
       if (!hasAccess) {
+        console.log(`❌ Send message access denied: ${userType} ${actualUserId} cannot access chat with companyId=${chat.companyId}, seekerId=${chat.seekerId}`);
         return res.status(403).json({
           success: false,
           message: 'Access denied to this chat'
@@ -183,7 +279,10 @@ class ChatController {
         });
       }
 
-      const message = await Chat.sendMessage(chatId, userId, userType, messageText, messageType);
+      console.log(`✅ Sending message from ${userType} ${actualUserId}`);
+
+      // Use the mapped ID for sending the message
+      const message = await Chat.sendMessage(chatId, actualUserId, userType, messageText, messageType);
       
       res.status(201).json({
         success: true,
@@ -210,6 +309,23 @@ class ChatController {
       const { chatId } = req.params;
       const { userId, userType } = req.user;
       
+      // Get the actual seeker/company ID for this user
+      let actualUserId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualUserId = seeker.id;
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualUserId = company.id;
+        }
+      }
+      
       // Verify user has access to this chat
       const chat = await Chat.findById(chatId);
       if (!chat) {
@@ -219,8 +335,9 @@ class ChatController {
         });
       }
 
-      const hasAccess = (userType === 'company' && chat.companyId === userId) ||
-                       (userType === 'seeker' && chat.seekerId === userId);
+      // Use the mapped ID for authorization check
+      const hasAccess = (userType === 'company' && chat.companyId === actualUserId) ||
+                       (userType === 'seeker' && chat.seekerId === actualUserId);
       
       if (!hasAccess) {
         return res.status(403).json({
@@ -229,7 +346,8 @@ class ChatController {
         });
       }
 
-      await Chat.markAsRead(chatId, userId, userType);
+      // Use the mapped ID for marking as read
+      await Chat.markAsRead(chatId, actualUserId, userType);
       
       res.status(200).json({
         success: true,

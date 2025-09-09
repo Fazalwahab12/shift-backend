@@ -149,8 +149,33 @@ class NotificationController {
       const { userId, userType } = req.user;
       const { limit = 50, offset = 0, unreadOnly = false } = req.query;
 
+      logger.info(`🔍 Getting notifications for user: ${userId}, type: ${userType}`);
+
+      // Get the actual seeker/company ID for this user
+      let actualReceiverId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualReceiverId = seeker.id;
+          logger.info(`🔄 Found seeker ID: ${actualReceiverId} for user: ${userId}`);
+        } else {
+          logger.warn(`⚠️ No seeker found for user: ${userId}`);
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualReceiverId = company.id;
+          logger.info(`🔄 Found company ID: ${actualReceiverId} for user: ${userId}`);
+        } else {
+          logger.warn(`⚠️ No company found for user: ${userId}`);
+        }
+      }
+
       const result = await notificationService.getUserNotifications(
-        userId,
+        actualReceiverId,
         {
           limit: parseInt(limit),
           offset: parseInt(offset),
@@ -187,9 +212,26 @@ class NotificationController {
    */
   async getUnreadCountAuth(req, res) {
     try {
-      const { userId } = req.user;
+      const { userId, userType } = req.user;
       
-      const result = await notificationService.getUnreadCount(userId);
+      // Get the actual seeker/company ID for this user
+      let actualReceiverId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualReceiverId = seeker.id;
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualReceiverId = company.id;
+        }
+      }
+      
+      const result = await notificationService.getUnreadCount(actualReceiverId);
       
       // Disable caching for dynamic data
       res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -219,9 +261,26 @@ class NotificationController {
   async markAsReadAuth(req, res) {
     try {
       const { notificationId } = req.params;
-      const { userId } = req.user;
+      const { userId, userType } = req.user;
       
-      const result = await notificationService.markAsRead(notificationId, userId);
+      // Get the actual seeker/company ID for this user
+      let actualReceiverId = userId;
+      
+      if (userType === 'seeker') {
+        const Seeker = require('../models/Seeker');
+        const seeker = await Seeker.findByUserId(userId);
+        if (seeker) {
+          actualReceiverId = seeker.id;
+        }
+      } else if (userType === 'company') {
+        const Company = require('../models/Company');
+        const company = await Company.findByUserId(userId);
+        if (company) {
+          actualReceiverId = company.id;
+        }
+      }
+      
+      const result = await notificationService.markAsRead(notificationId, actualReceiverId);
       
       res.status(200).json({
         success: true,
