@@ -8,6 +8,7 @@ const express = require('express');
 const router = express.Router();
 const notificationController = require('../controllers/notificationController');
 const { body, param, query, validationResult } = require('express-validator');
+const { authenticateToken } = require('../middleware/auth');
 
 // Middleware for handling validation errors
 const handleValidationErrors = (req, res, next) => {
@@ -91,7 +92,17 @@ router.get('/user/:userId', validateGetUserNotifications, notificationController
  * @params  notificationId - Notification ID
  * @body    {userId}
  */
-router.put('/:notificationId/read', validateMarkAsRead, notificationController.markAsRead);
+router.put('/:notificationId/read', authenticateToken, validateMarkAsRead, notificationController.markAsRead);
+
+/**
+ * @route   PUT /api/notifications/:notificationId/read-auth
+ * @desc    Mark notification as read (auth-based)
+ * @access  Private
+ */
+router.put('/:notificationId/read-auth', authenticateToken, [
+  param('notificationId').isString().notEmpty().withMessage('Valid notification ID is required'),
+  handleValidationErrors
+], notificationController.markAsReadAuth);
 
 /**
  * @route   PUT /api/notifications/bulk-read
@@ -108,6 +119,25 @@ router.put('/bulk-read', validateBulkMarkAsRead, notificationController.bulkMark
  * @params  userId - User ID
  */
 router.get('/unread-count/:userId', validateUserId, notificationController.getUnreadCount);
+
+/**
+ * @route   GET /api/notifications
+ * @desc    Get user's notifications (auth-based)
+ * @access  Private
+ */
+router.get('/', authenticateToken, [
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('offset').optional().isInt({ min: 0 }).withMessage('Offset must be 0 or greater'),
+  query('unreadOnly').optional().isBoolean().withMessage('UnreadOnly must be a boolean'),
+  handleValidationErrors
+], notificationController.getUserNotificationsAuth);
+
+/**
+ * @route   GET /api/notifications/unread-count
+ * @desc    Get unread notification count for authenticated user
+ * @access  Private
+ */
+router.get('/unread-count', authenticateToken, notificationController.getUnreadCountAuth);
 
 // Helper routes for specific notification types
 

@@ -17,6 +17,11 @@ class ChatController {
       
       const chats = await Chat.findByUserId(userId, userType);
       
+      // Disable caching for dynamic data
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       res.status(200).json({
         success: true,
         message: 'Chats retrieved successfully',
@@ -110,6 +115,11 @@ class ChatController {
       }
 
       const messages = await Chat.getMessages(chatId, parseInt(limit), lastTimestamp);
+      
+      // Disable caching for dynamic data
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
       
       res.status(200).json({
         success: true,

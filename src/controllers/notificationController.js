@@ -141,6 +141,105 @@ class NotificationController {
   }
 
   /**
+   * Get user's notifications (auth-based)
+   * GET /api/notifications
+   */
+  async getUserNotificationsAuth(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { limit = 50, offset = 0, unreadOnly = false } = req.query;
+
+      const result = await notificationService.getUserNotifications(
+        userId,
+        {
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          unreadOnly: unreadOnly === 'true' || unreadOnly === true
+        }
+      );
+      
+      // Disable caching for dynamic data
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
+      res.status(200).json({
+        success: true,
+        message: 'Notifications retrieved successfully',
+        data: result.notifications || [],
+        count: result.count || 0,
+        hasMore: result.hasMore || false
+      });
+
+    } catch (error) {
+      logger.error('❌ Get user notifications (auth) error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || ERROR_MESSAGES.INTERNAL_ERROR,
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  /**
+   * Get unread notification count (auth-based)
+   * GET /api/notifications/unread-count
+   */
+  async getUnreadCountAuth(req, res) {
+    try {
+      const { userId } = req.user;
+      
+      const result = await notificationService.getUnreadCount(userId);
+      
+      // Disable caching for dynamic data
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
+      res.status(200).json({
+        success: true,
+        message: 'Unread count retrieved successfully',
+        data: { count: result.count || 0 }
+      });
+
+    } catch (error) {
+      logger.error('❌ Get unread count (auth) error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || ERROR_MESSAGES.INTERNAL_ERROR,
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  /**
+   * Mark notification as read (auth-based)
+   * PUT /api/notifications/:notificationId/read-auth
+   */
+  async markAsReadAuth(req, res) {
+    try {
+      const { notificationId } = req.params;
+      const { userId } = req.user;
+      
+      const result = await notificationService.markAsRead(notificationId, userId);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Notification marked as read',
+        data: result
+      });
+
+    } catch (error) {
+      logger.error('❌ Mark as read (auth) error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || ERROR_MESSAGES.INTERNAL_ERROR,
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+
+  /**
    * Bulk mark notifications as read
    * PUT /api/notifications/bulk-read
    */
