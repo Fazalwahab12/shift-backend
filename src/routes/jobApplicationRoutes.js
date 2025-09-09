@@ -167,6 +167,17 @@ router.put('/applications/:applicationId/hire-response', [
 ], JobApplicationController.respondToHireRequest);
 
 /**
+ * @route   PUT /api/applications/:applicationId/interview-response
+ * @desc    Respond to interview invitation (seeker only)
+ * @access  Private (Seeker)
+ */
+router.put('/applications/:applicationId/interview-response', [
+  body('response')
+    .isIn(['accepted', 'declined'])
+    .withMessage('Response must be either "accepted" or "declined"')
+], JobApplicationController.respondToInterviewRequest);
+
+/**
  * @route   POST /api/applications/:applicationId/report
  * @desc    Report attendance/absence (company or seeker)
  * @access  Private

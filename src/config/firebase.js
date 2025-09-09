@@ -17,9 +17,9 @@ class FirebaseConfig {
       if (!admin.apps.length) {
         // For production, use service account key file
         // For development, you can use the Firebase emulator or service account
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-          : require('../../config/firebase-service-account.json'); // Place your service account file here
+      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+  ? JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf8"))
+  : require("../../config/firebase-service-account.json");
 
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),

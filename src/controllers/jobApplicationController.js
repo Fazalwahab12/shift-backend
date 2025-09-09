@@ -381,8 +381,27 @@ class JobApplicationController {
       const Job = require('../models/Job');
       const job = await Job.findByJobId(application.jobId);
       
-      // Check if company owns this application (can be either companyId or userId)
-      const hasAccess = application.companyId === userId || job?.userId === userId;
+      // Check if user belongs to the same company
+      let hasAccess = application.companyId === userId || job?.userId === userId;
+      
+      console.log(`🔍 Decline Initial access check - App CompanyId: ${application.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, Initial HasAccess: ${hasAccess}`);
+      
+      // If no direct match, check if user belongs to the company
+      if (!hasAccess && job?.companyId) {
+        try {
+          const Company = require('../models/Company');
+          console.log(`🔍 Decline: Checking company membership for user ${userId}...`);
+          const userCompany = await Company.findByUserId(userId);
+          console.log(`🔍 Decline: User's company:`, userCompany ? { id: userCompany.id, companyName: userCompany.companyName } : 'Not found');
+          
+          if (userCompany && userCompany.id === job.companyId) {
+            hasAccess = true;
+            console.log(`✅ Decline: Access granted via company membership`);
+          }
+        } catch (companyCheckError) {
+          console.log('Error checking company ownership for decline:', companyCheckError);
+        }
+      }
       
       console.log(`🔍 Decline Access Check - App CompanyId: ${application.companyId}, Job CompanyId: ${job?.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
       
@@ -489,8 +508,33 @@ class JobApplicationController {
       const Job = require('../models/Job');
       const job = await Job.findByJobId(application.jobId);
       
-      // Check if company owns this application (can be either companyId or userId)
-      const hasAccess = application.companyId === userId || job?.userId === userId;
+      // Check if user belongs to the same company
+      // Option 1: Direct user match (job creator)
+      // Option 2: Company ID match (application belongs to user's company)  
+      // Option 3: Job's companyId matches user's company profile
+      let hasAccess = application.companyId === userId || job?.userId === userId;
+      
+      console.log(`🔍 Initial access check - App CompanyId: ${application.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, Initial HasAccess: ${hasAccess}`);
+      
+      // If no direct match, check if user belongs to the company
+      if (!hasAccess && job?.companyId) {
+        try {
+          const Company = require('../models/Company');
+          console.log(`🔍 Checking company membership for user ${userId}...`);
+          const userCompany = await Company.findByUserId(userId);
+          console.log(`🔍 User's company:`, userCompany ? { id: userCompany.id, companyName: userCompany.companyName } : 'Not found');
+          console.log(`🔍 Job's companyId: ${job.companyId}`);
+          
+          if (userCompany && userCompany.id === job.companyId) {
+            hasAccess = true;
+            console.log(`✅ Access granted: User belongs to company ${job.companyId}`);
+          } else {
+            console.log(`❌ Access denied: User does not belong to job's company`);
+          }
+        } catch (companyCheckError) {
+          console.log('Error checking company ownership:', companyCheckError);
+        }
+      }
       
       console.log(`🔍 Hire Access Check - App CompanyId: ${application.companyId}, Job CompanyId: ${job?.companyId}, Job UserId: ${job?.userId}, RequestUserId: ${userId}, HasAccess: ${hasAccess}`);
       
@@ -592,7 +636,35 @@ class JobApplicationController {
 
       const { applicationId } = req.params;
       const { userId, userType } = req.user;
-      const { interviewDate, interviewTime } = req.body;
+      
+      console.log('🔍 Backend received interview scheduling request:', {
+        applicationId,
+        userId,
+        userType,
+        body: req.body
+      });
+      
+      const { 
+        interviewDate, 
+        interviewTime, 
+        duration = 30, 
+        interviewType = 'in-person', 
+        location, 
+        notes 
+      } = req.body;
+      
+      console.log('🔍 Extracted interview data:', {
+        interviewDate,
+        interviewTime,
+        duration,
+        interviewType,
+        location,
+        notes,
+        dateType: typeof interviewDate,
+        timeType: typeof interviewTime,
+        locationIsUndefined: location === undefined,
+        notesIsUndefined: notes === undefined
+      });
 
       // Verify user is a company
       if (userType !== 'company') {
@@ -632,7 +704,18 @@ class JobApplicationController {
       }
 
       // Schedule interview - this triggers chat creation
-      await application.scheduleInterview(interviewDate, interviewTime);
+      const interviewData = {
+        interviewDate,
+        interviewTime,
+        duration,
+        interviewType,
+        location,
+        notes
+      };
+      
+      console.log('🔍 Calling application.scheduleInterview with:', interviewData);
+      
+      await application.scheduleInterview(interviewData);
       
       res.status(200).json({
         success: true,
@@ -948,6 +1031,76 @@ class JobApplicationController {
       res.status(500).json({
         success: false,
         message: 'Failed to respond to hire request',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Respond to interview request (seeker)
+   * PUT /api/applications/:applicationId/interview-response
+   */
+  static async respondToInterviewRequest(req, res) {
+    try {
+      const { applicationId } = req.params;
+      const { userId, userType } = req.user;
+      const { response } = req.body;
+
+      // Verify user is a seeker
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only job seekers can respond to interview requests'
+        });
+      }
+
+      const application = await JobApplication.findById(applicationId);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found'
+        });
+      }
+
+      // Get seeker document to verify ownership
+      const Seeker = require('../models/Seeker');
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Verify seeker owns the application
+      if (application.seekerId !== seeker.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this application'
+        });
+      }
+
+      // Verify application has interview scheduled
+      if (!application.interviewScheduled || application.status !== 'interviewed') {
+        return res.status(400).json({
+          success: false,
+          message: 'No interview invitation found for this application'
+        });
+      }
+
+      await application.respondToInterviewRequest(response);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Interview response submitted successfully',
+        data: application.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error responding to interview request:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to respond to interview request',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

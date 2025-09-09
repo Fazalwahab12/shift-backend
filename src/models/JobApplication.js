@@ -54,10 +54,13 @@ class JobApplication {
     this.interviewTime = data.interviewTime || null;
     this.interviewDuration = data.interviewDuration || null; // in minutes
     this.interviewEndTime = data.interviewEndTime || null;
+    this.interviewId = data.interviewId || null; // ID of the Interview record
     this.interviewStatus = data.interviewStatus || null; // 'scheduled', 'completed', 'cancelled', 'no_show'
     this.interviewType = data.interviewType || 'in-person'; // 'in-person', 'phone', 'video'
     this.interviewLocation = data.interviewLocation || null;
     this.interviewNotes = data.interviewNotes || null;
+    this.interviewResponse = data.interviewResponse || null; // 'accepted', 'declined'
+    this.interviewRespondedAt = data.interviewRespondedAt || null;
     
     // Chat integration
     this.chatId = data.chatId || null;
@@ -711,6 +714,51 @@ class JobApplication {
       throw new Error('Failed to respond to hire request');
     }
   }
+
+  /**
+   * Respond to interview request (seeker)
+   */
+  async respondToInterviewRequest(response) {
+    try {
+      if (!['accepted', 'declined'].includes(response)) {
+        throw new Error('Invalid interview response. Must be "accepted" or "declined"');
+      }
+      
+      this.interviewResponse = response;
+      this.interviewRespondedAt = new Date().toISOString();
+      this.updatedAt = new Date().toISOString();
+      
+      // Update interview status based on response
+      if (response === 'accepted') {
+        this.interviewStatus = 'confirmed';
+      } else {
+        this.interviewStatus = 'declined';
+      }
+      
+      await databaseService.update(
+        COLLECTIONS.JOB_APPLICATIONS,
+        this.id,
+        {
+          interviewResponse: this.interviewResponse,
+          interviewRespondedAt: this.interviewRespondedAt,
+          interviewStatus: this.interviewStatus,
+          updatedAt: this.updatedAt
+        }
+      );
+
+      // Send confirmation notification
+      if (response === 'accepted') {
+        await JobApplication.notifyCompanyOfInterviewAcceptance(this);
+      } else {
+        await JobApplication.notifyCompanyOfInterviewDecline(this);
+      }
+      
+      return this;
+    } catch (error) {
+      console.error('Error responding to interview request:', error);
+      throw new Error('Failed to respond to interview request');
+    }
+  }
   
   /**
    * Report absence/attendance
@@ -815,12 +863,31 @@ class JobApplication {
       this.statusChangedAt = new Date().toISOString();
       this.updatedAt = new Date().toISOString();
       
+      // Create Interview record for response handling
+      const Interview = require('./Interview');
+      const interview = await Interview.create({
+        applicationId: this.id,
+        jobId: this.jobId,
+        seekerId: this.seekerId,
+        companyId: this.companyId,
+        interviewDate,
+        startTime: interviewTime,
+        duration,
+        interviewType,
+        location,
+        instructions: notes,
+        status: 'scheduled'
+      });
+      
+      this.interviewId = interview.id;
+      
       await databaseService.update(
         COLLECTIONS.JOB_APPLICATIONS,
         this.id,
         {
           status: this.status,
           interviewScheduled: this.interviewScheduled,
+          interviewId: this.interviewId,
           interviewDate: this.interviewDate,
           interviewTime: this.interviewTime,
           interviewDuration: this.interviewDuration,
@@ -1072,6 +1139,28 @@ class JobApplication {
   }
 
   /**
+   * Notify company of interview acceptance
+   */
+  static async notifyCompanyOfInterviewAcceptance(application) {
+    try {
+      console.log(`📧 Interview acceptance notification sent to company ${application.companyId} for application ${application.applicationId}`);
+    } catch (error) {
+      console.error('Error sending interview acceptance notification:', error);
+    }
+  }
+  
+  /**
+   * Notify company of interview decline
+   */
+  static async notifyCompanyOfInterviewDecline(application) {
+    try {
+      console.log(`📧 Interview decline notification sent to company ${application.companyId} for application ${application.applicationId}`);
+    } catch (error) {
+      console.error('Error sending interview decline notification:', error);
+    }
+  }
+
+  /**
    * Check if seeker is blocked by company
    */
   static async checkSeekerBlocked(companyId, seekerId) {
@@ -1217,10 +1306,13 @@ class JobApplication {
       interviewTime: this.interviewTime,
       interviewDuration: this.interviewDuration,
       interviewEndTime: this.interviewEndTime,
+      interviewId: this.interviewId,
       interviewStatus: this.interviewStatus,
       interviewType: this.interviewType,
       interviewLocation: this.interviewLocation,
       interviewNotes: this.interviewNotes,
+      interviewResponse: this.interviewResponse,
+      interviewRespondedAt: this.interviewRespondedAt,
       
       // Communication
       chatId: this.chatId,

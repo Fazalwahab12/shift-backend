@@ -273,7 +273,7 @@ POST /api/jobs/:jobId/invite/:seekerId
 GET /api/jobs/:jobId/applications
 
 # Company accepts (creates chat)
-PUT /api/applications/:applicationId/accept
+PUT /api/applications/:applicationId/m
 
 # Company declines with reason
 PUT /api/applications/:applicationId/decline
