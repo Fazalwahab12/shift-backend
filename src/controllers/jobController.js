@@ -511,6 +511,53 @@ class JobController {
   }
 
   /**
+   * Cancel job (change status to closed)
+   * PUT /api/jobs/:jobId/cancel
+   */
+  static async cancelJob(req, res) {
+    try {
+      const { jobId } = req.params;
+
+      const job = await Job.findByJobId(jobId);
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found'
+        });
+      }
+
+      // Check if job is already canceled
+      if (job.jobStatus === 'closed') {
+        return res.status(400).json({
+          success: false,
+          message: 'Job is already canceled'
+        });
+      }
+
+      // Update job status to closed
+      const updatedJob = await job.update({
+        jobStatus: 'closed',
+        applicationStatus: 'Canceled',
+        canceledDate: new Date().toISOString()
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Job canceled successfully',
+        data: updatedJob.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error canceling job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
    * Get job statistics
    * GET /api/jobs/stats
    */

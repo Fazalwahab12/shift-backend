@@ -59,6 +59,7 @@ class Job {
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.createdAt = data.createdAt || new Date().toISOString();
     this.updatedAt = data.updatedAt || new Date().toISOString();
+    this.canceledDate = data.canceledDate || null; // Date when job was canceled
     
     // Location & Company Details (inherited from company)
     this.companyName = data.companyName || null;
@@ -309,6 +310,7 @@ class Job {
       isActive: this.isActive,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
+      canceledDate: this.canceledDate,
       companyName: this.companyName,
       brandName: this.brandName,
       locationAddress: this.locationAddress,
@@ -333,18 +335,23 @@ class Job {
       jobCoverImage: this.jobCoverImage,
       jobSummary: this.jobSummary,
       hiringType: this.hiringType,
+      jobDuration: this.jobDuration,
       shiftTypes: this.shiftTypes,
       shiftTimeRanges: this.shiftTimeRanges,
       startDate: this.startDate,
       startTime: this.startTime,
       hoursPerDay: this.hoursPerDay,
       payPerHour: this.payPerHour,
+      paymentTerms: this.paymentTerms,
       requiredSkills: this.requiredSkills,
       requiredLanguages: this.requiredLanguages,
       genderPreference: this.genderPreference,
       jobPerks: this.jobPerks,
       applicationStatus: this.applicationStatus,
       publishedAt: this.publishedAt,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      canceledDate: this.canceledDate,
       applicationsCount: this.applicationsCount,
       viewsCount: this.viewsCount
     };

@@ -439,6 +439,17 @@ router.post('/:jobId/copy', authenticateToken, [
 ], JobController.copyJob);
 
 /**
+ * @route   PUT /api/jobs/:jobId/cancel
+ * @desc    Cancel job (change status to closed)
+ * @access  Private (JWT Token Required)
+ */
+router.put('/:jobId/cancel', authenticateToken, [
+  param('jobId')
+    .notEmpty()
+    .withMessage('Job ID is required')
+], JobController.cancelJob);
+
+/**
  * @route   GET /api/jobs/stats
  * @desc    Get job statistics
  * @access  Public
