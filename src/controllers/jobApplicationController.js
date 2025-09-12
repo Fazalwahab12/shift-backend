@@ -1206,13 +1206,12 @@ class JobApplicationController {
 
   /**
    * Block seeker
-   * POST /api/seekers/:seekerId/block
+   * POST /api/company/block-seeker
    */
   static async blockSeeker(req, res) {
     try {
-      const { seekerId } = req.params;
       const { userId, userType } = req.user;
-      const { reason } = req.body;
+      const { seekerId, reason } = req.body;
 
       // Verify user is a company
       if (userType !== 'company') {
@@ -1222,7 +1221,31 @@ class JobApplicationController {
         });
       }
 
-      // Block seeker logic would go here
+      // Get company by userId
+      const Company = require('../models/Company');
+      const company = await Company.findByUserId(userId);
+      
+      console.log(`🔍 Blocking - Finding company for userId: ${userId}`);
+      console.log(`🏢 Company found for blocking:`, company ? {
+        id: company.id, 
+        name: company.companyName,
+        currentBlockedCount: company.blockedSeekers?.length || 0
+      } : 'None');
+      
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      console.log(`🚫 Attempting to block seekerId: ${seekerId} with reason: ${reason}`);
+      
+      // Block the seeker - use company ID, not user ID
+      await company.blockSeeker(seekerId, reason, company.id);
+      
+      console.log(`✅ Block completed. New blocked count: ${company.blockedSeekers?.length || 0}`);
+
       res.status(200).json({
         success: true,
         message: 'Seeker blocked successfully',
@@ -1237,7 +1260,7 @@ class JobApplicationController {
       console.error('Error blocking seeker:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to block seeker',
+        message: error.message || 'Failed to block seeker',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
@@ -1245,12 +1268,13 @@ class JobApplicationController {
 
   /**
    * Unblock seeker
-   * DELETE /api/seekers/:seekerId/block
+   * PUT /api/company/unblock-seeker/:seekerId
    */
   static async unblockSeeker(req, res) {
     try {
       const { seekerId } = req.params;
       const { userId, userType } = req.user;
+      const { reason } = req.body;
 
       // Verify user is a company
       if (userType !== 'company') {
@@ -1260,7 +1284,20 @@ class JobApplicationController {
         });
       }
 
-      // Unblock seeker logic would go here
+      // Get company by userId
+      const Company = require('../models/Company');
+      const company = await Company.findByUserId(userId);
+      
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Unblock the seeker - use company ID, not user ID
+      await company.unblockSeeker(seekerId, reason || 'Unblocked by company', company.id);
+
       res.status(200).json({
         success: true,
         message: 'Seeker unblocked successfully',
@@ -1274,7 +1311,7 @@ class JobApplicationController {
       console.error('Error unblocking seeker:', error);
       res.status(500).json({
         success: false,
-        message: 'Failed to unblock seeker',
+        message: error.message || 'Failed to unblock seeker',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
@@ -1296,13 +1333,72 @@ class JobApplicationController {
         });
       }
 
-      // Get blocked seekers logic would go here
-      const blockedSeekers = [];
+      // Get company by userId
+      const Company = require('../models/Company');
+      const company = await Company.findByUserId(userId);
+      
+      console.log(`🔍 Finding company for userId: ${userId}`);
+      console.log(`🏢 Company found:`, company ? {
+        id: company.id, 
+        name: company.companyName,
+        blockedSeekersCount: company.blockedSeekers?.length || 0
+      } : 'None');
+      
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Get blocked seekers from company
+      const blockedSeekers = company.getBlockedSeekers(true); // Only active blocks
+      console.log(`📋 Blocked seekers found: ${blockedSeekers.length}`);
+      
+      // Get seeker details for each blocked seeker
+      const Seeker = require('../models/Seeker');
+      const blockedSeekersWithDetails = await Promise.all(
+        blockedSeekers.map(async (block) => {
+          try {
+            const seeker = await Seeker.findById(block.seekerId);
+            return {
+              id: `${company.id}_${block.seekerId}`,
+              seekerId: block.seekerId,
+              companyId: company.id,
+              reason: block.reason,
+              blockedAt: block.blockedAt,
+              seeker: seeker ? {
+                fullName: seeker.fullName,
+                email: seeker.email,
+                mobileNumber: seeker.mobileNumber,
+                profilePhoto: seeker.profilePhoto,
+                skills: seeker.skills || [],
+                yearsOfExperience: seeker.yearsOfExperience,
+                isVerified: seeker.isVerified,
+                averageRating: seeker.averageRating
+              } : null
+            };
+          } catch (error) {
+            console.error(`Error fetching seeker ${block.seekerId}:`, error);
+            return {
+              id: `${company.id}_${block.seekerId}`,
+              seekerId: block.seekerId,
+              companyId: company.id,
+              reason: block.reason,
+              blockedAt: block.blockedAt,
+              seeker: null
+            };
+          }
+        })
+      );
+
+      // Filter out entries where seeker details couldn't be fetched
+      const validBlockedSeekers = blockedSeekersWithDetails.filter(block => block.seeker !== null);
       
       res.status(200).json({
         success: true,
         message: 'Blocked seekers retrieved successfully',
-        data: blockedSeekers
+        data: { blockedSeekers: validBlockedSeekers }
       });
 
     } catch (error) {
