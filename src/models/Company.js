@@ -261,9 +261,8 @@ class Company {
     };
     
     // 14-DAY TRIAL SYSTEM
-    this.trialStartDate = data.trialStartDate || new Date().toISOString();
+    this.trialStartAt = data.trialStartAt || data.trialStartDate || new Date().toISOString();
     this.trialEndDate = data.trialEndDate || this.calculateTrialEndDate();
-    this.trialDaysRemaining = data.trialDaysRemaining || 14;
     this.trialExpired = data.trialExpired || false;
     
     // ENHANCED PAYMENT INTEGRATION 
@@ -731,7 +730,7 @@ class Company {
    * Calculate trial end date
    */
   calculateTrialEndDate() {
-    const trialStart = new Date(this.trialStartDate);
+    const trialStart = new Date(this.trialStartAt);
     const trialEnd = new Date(trialStart.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days
     return trialEnd.toISOString();
   }
@@ -903,7 +902,7 @@ class Company {
     try {
       const company = new Company({
         userId: userId,
-        trialStartDate: new Date().toISOString(),
+        trialStartAt: new Date().toISOString(),
         ...companyData
       });
 
@@ -925,7 +924,7 @@ class Company {
    */
   calculateRemainingDays() {
     const now = new Date();
-    const trialStart = new Date(this.trialStartDate);
+    const trialStart = new Date(this.trialStartAt);
     const daysPassed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
     return Math.max(0, 14 - daysPassed);
   }
@@ -950,14 +949,13 @@ class Company {
   async updateTrialStatus() {
     try {
       const now = new Date();
-      const trialStart = new Date(this.trialStartDate);
+      const trialStart = new Date(this.trialStartAt);
       const trialEnd = new Date(this.trialEndDate);
       
       const daysPassed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
       const daysRemaining = Math.max(0, 14 - daysPassed);
       
       const updateData = {
-        trialDaysRemaining: daysRemaining,
         trialExpired: daysRemaining === 0,
         updatedAt: new Date().toISOString()
       };
@@ -1951,9 +1949,8 @@ class Company {
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.subscriptionStatus,
       pricingDetails: this.pricingDetails,
-      trialStartDate: this.trialStartDate,
+      trialStartAt: this.trialStartAt,
       trialEndDate: this.trialEndDate,
-      trialDaysRemaining: this.trialDaysRemaining,
       trialExpired: this.trialExpired,
       paymentMethods: this.paymentMethods,
       defaultPaymentMethod: this.defaultPaymentMethod,
@@ -2100,7 +2097,6 @@ class Company {
       // Subscription info with pricing details
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.getSubscriptionStatus(),
-      trialDaysRemaining: this.trialDaysRemaining,
       trialExpired: this.trialExpired,
       trialStatus: this.getTrialStatus(),
       planLimits: this.getPlanLimits(),
@@ -2204,9 +2200,8 @@ class Company {
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.subscriptionStatus,
       pricingDetails: this.pricingDetails,
-      trialStartDate: this.trialStartDate,
+      trialStartAt: this.trialStartAt,
       trialEndDate: this.trialEndDate,
-      trialDaysRemaining: this.trialDaysRemaining,
       trialExpired: this.trialExpired,
       paymentMethods: this.paymentMethods,
       paymentHistory: this.paymentHistory.slice(-10), // Last 10 transactions
