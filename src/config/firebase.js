@@ -11,17 +11,29 @@ class FirebaseConfig {
   async initialize() {
     try {
       if (!admin.apps.length) {
-        let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-          : require('../../config/firebase-service-account.json');
-      
-        // 🔑 Fix private_key newlines
-        if (serviceAccount.private_key) {
-          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        let serviceAccount;
+
+        if (process.env.FIREBASE_SERVICE_ACCOUNT && process.env.FIREBASE_SERVICE_ACCOUNT.trim() !== "") {
+          console.log("🔑 Using FIREBASE_SERVICE_ACCOUNT from environment variable");
+          try {
+            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          } catch (parseError) {
+            throw new Error("Invalid JSON in FIREBASE_SERVICE_ACCOUNT env var. Did you paste it correctly?");
+          }
+        } else {
+          console.log("📂 Using local firebase-service-account.json file");
+          serviceAccount = require(path.join(__dirname, "../../config/firebase-service-account.json"));
         }
-      
+
+        // 🔑 Fix private_key newlines for Firebase Admin
+        if (serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+        } else {
+          throw new Error("Service account JSON is missing 'private_key'");
+        }
+
         console.log("✅ Service account loaded, project_id:", serviceAccount.project_id);
-      
+
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
           databaseURL:
@@ -32,10 +44,9 @@ class FirebaseConfig {
             `${serviceAccount.project_id}.appspot.com`,
           projectId: serviceAccount.project_id,
         });
-      
-        console.log("🔥 Firebase Admin SDK initialized with JSON file");
+
+        console.log("🔥 Firebase Admin SDK initialized");
       }
-      
 
       this.db = admin.firestore();
       this.auth = admin.auth();
@@ -43,7 +54,7 @@ class FirebaseConfig {
 
       this.db.settings({ ignoreUndefinedProperties: true });
 
-      // Test Firestore access
+      // 🔍 Quick Firestore test
       try {
         const testDoc = await this.db.collection("debug").doc("test").get();
         console.log("🔍 Firestore test read success:", testDoc.exists);
