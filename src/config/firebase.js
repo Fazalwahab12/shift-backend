@@ -11,17 +11,11 @@ class FirebaseConfig {
   async initialize() {
     try {
       if (!admin.apps.length) {
-        const serviceAccountPath = path.resolve(__dirname, "../../config/firebase-service-account.json");
-        console.log("📂 Loading service account from:", serviceAccountPath);
+        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+        : require('../../config/firebase-service-account.json');
 
-        let serviceAccount;
-        try {
-          serviceAccount = require(serviceAccountPath);
-          console.log("✅ Service account loaded, project_id:", serviceAccount.project_id);
-        } catch (err) {
-          console.error("❌ Failed to load service account JSON:", err);
-          throw err;
-        }
+        console.log("✅ Service account loaded, project_id:", serviceAccount.project_id);
 
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
