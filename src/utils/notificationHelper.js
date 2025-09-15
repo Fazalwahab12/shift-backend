@@ -5,6 +5,7 @@
  */
 
 const notificationService = require('../services/notificationService');
+const notificationController = require('../controllers/notificationController');
 const logger = require('./logger');
 
 class NotificationHelper {

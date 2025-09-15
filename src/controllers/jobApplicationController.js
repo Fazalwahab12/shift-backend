@@ -3,6 +3,7 @@ const { databaseService, COLLECTIONS } = require('../config/database');
 const JobApplication = require('../models/JobApplication');
 const Job = require('../models/Job');
 const Chat = require('../models/Chat');
+const NotificationHelper = require('../utils/notificationHelper');
 
 /**
  * Job Application Controller
@@ -87,6 +88,41 @@ class JobApplicationController {
       
       // Increment the job's applications count
       await job.incrementApplications();
+
+      // 🔥 AUTO-TRIGGER APPLICATION SUBMITTED NOTIFICATIONS
+      try {
+        const Company = require('../models/Company');
+        const company = await Company.findById(job.companyId);
+        
+        if (company) {
+          const applicationNotificationData = {
+            jobSeeker: {
+              id: seeker.id,
+              email: seeker.email,
+              firstName: seeker.firstName,
+              lastName: seeker.lastName
+            },
+            job: {
+              id: job.jobId,
+              title: job.title || job.roleName
+            },
+            company: {
+              id: company.id,
+              name: company.companyName,
+              companyName: company.companyName,
+              email: company.companyEmail,
+              contactEmail: company.companyEmail
+            },
+            applicationType: job.jobType || job.hiringType
+          };
+
+          await NotificationHelper.triggerApplicationSubmitted(applicationNotificationData);
+          console.log('✅ Application submitted notifications sent successfully');
+        }
+      } catch (notifError) {
+        console.error('❌ Failed to send application submitted notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
       
       res.status(201).json({
         success: true,
@@ -325,6 +361,29 @@ class JobApplicationController {
       }
 
       await application.reject(reason);
+
+      // 🔥 AUTO-TRIGGER APPLICATION REJECTED NOTIFICATION
+      try {
+        const seeker = await Seeker.findById(application.seekerId);
+        
+        if (seeker) {
+          const rejectionData = {
+            jobTitle: application.jobTitle,
+            jobId: application.jobId,
+            seekerName: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+            seekerId: seeker.id,
+            seekerEmail: seeker.email,
+            companyName: application.companyName,
+            reason: reason || 'Application was not selected'
+          };
+
+          await notificationController.sendApplicationRejected(rejectionData);
+          console.log('✅ Application rejected notifications sent successfully');
+        }
+      } catch (notifError) {
+        console.error('❌ Failed to send application rejected notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
       
       res.status(200).json({
         success: true,

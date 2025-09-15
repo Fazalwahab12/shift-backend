@@ -105,6 +105,7 @@ class JobApplication {
             fullName: seeker.fullName,
             email: seeker.email,
             mobileNumber: seeker.mobileNumber,
+            dateOfBirth: seeker.dateOfBirth,
             profilePhoto: seeker.profilePhoto,
             profileVideo: seeker.profileVideo,
             bio: seeker.bio,

@@ -258,6 +258,265 @@ router.post('/payment-successful', [
   }
 });
 
+/**
+ * @route   POST /api/notifications/admin-create-company
+ * @desc    Send admin creates company account notification
+ * @access  Private
+ */
+router.post('/admin-create-company', [
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('companyData.id').isString().notEmpty().withMessage('Company ID is required'),
+  body('companyData.email').isEmail().withMessage('Valid company email is required'),
+  body('companyData.name').isString().notEmpty().withMessage('Company name is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { companyData } = req.body;
+    const result = await notificationController.sendAdminCreateCompanyAccount(companyData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/job-edited
+ * @desc    Send job edited notification
+ * @access  Private
+ */
+router.post('/job-edited', [
+  body('jobData').isObject().notEmpty().withMessage('Job data is required'),
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('adminEmails').optional().isArray().withMessage('Admin emails must be an array'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { jobData, companyData, adminEmails = [] } = req.body;
+    const result = await notificationController.sendJobEdited(jobData, companyData, adminEmails);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/job-cancelled
+ * @desc    Send job cancelled notification
+ * @access  Private
+ */
+router.post('/job-cancelled', [
+  body('jobData').isObject().notEmpty().withMessage('Job data is required'),
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('adminEmails').optional().isArray().withMessage('Admin emails must be an array'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { jobData, companyData, adminEmails = [] } = req.body;
+    const result = await notificationController.sendJobCancelled(jobData, companyData, adminEmails);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/payment-failed
+ * @desc    Send payment failed notification
+ * @access  Private
+ */
+router.post('/payment-failed', [
+  body('companyId').isString().notEmpty().withMessage('Company ID is required'),
+  body('companyEmail').isEmail().withMessage('Valid company email is required'),
+  body('companyName').isString().notEmpty().withMessage('Company name is required'),
+  body('amount').isString().notEmpty().withMessage('Amount is required'),
+  body('currency').isString().notEmpty().withMessage('Currency is required'),
+  body('planName').isString().notEmpty().withMessage('Plan name is required'),
+  body('adminEmails').optional().isArray().withMessage('Admin emails must be an array'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { adminEmails = [], ...paymentData } = req.body;
+    const result = await notificationController.sendPaymentFailed(paymentData, adminEmails);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/interview-declined
+ * @desc    Send interview declined notification
+ * @access  Private
+ */
+router.post('/interview-declined', [
+  body('interviewData').isObject().notEmpty().withMessage('Interview data is required'),
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('seekerData').isObject().notEmpty().withMessage('Seeker data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { interviewData, companyData, seekerData } = req.body;
+    const result = await notificationController.sendInterviewDeclined(interviewData, companyData, seekerData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/interview-rescheduled
+ * @desc    Send interview rescheduled notification
+ * @access  Private
+ */
+router.post('/interview-rescheduled', [
+  body('interviewData').isObject().notEmpty().withMessage('Interview data is required'),
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('seekerData').isObject().notEmpty().withMessage('Seeker data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { interviewData, companyData, seekerData } = req.body;
+    const result = await notificationController.sendInterviewRescheduled(interviewData, companyData, seekerData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/interview-reminder
+ * @desc    Send interview reminder notification
+ * @access  Private
+ */
+router.post('/interview-reminder', [
+  body('interviewData').isObject().notEmpty().withMessage('Interview data is required'),
+  body('seekerData').isObject().notEmpty().withMessage('Seeker data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { interviewData, seekerData } = req.body;
+    const result = await notificationController.sendInterviewReminder(interviewData, seekerData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/instant-hire-reminder
+ * @desc    Send instant hire reminder notification
+ * @access  Private
+ */
+router.post('/instant-hire-reminder', [
+  body('jobData').isObject().notEmpty().withMessage('Job data is required'),
+  body('seekerData').isObject().notEmpty().withMessage('Seeker data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { jobData, seekerData } = req.body;
+    const result = await notificationController.sendInstantHireReminder(jobData, seekerData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/hiring-acceptance
+ * @desc    Send hiring acceptance notification
+ * @access  Private
+ */
+router.post('/hiring-acceptance', [
+  body('hiringData').isObject().notEmpty().withMessage('Hiring data is required'),
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('seekerData').isObject().notEmpty().withMessage('Seeker data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { hiringData, companyData, seekerData } = req.body;
+    const result = await notificationController.sendHiringAcceptance(hiringData, companyData, seekerData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/trial-ended
+ * @desc    Send trial ended notification
+ * @access  Private
+ */
+router.post('/trial-ended', [
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('adminEmails').optional().isArray().withMessage('Admin emails must be an array'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { companyData, adminEmails = [] } = req.body;
+    const result = await notificationController.sendTrialEnded(companyData, adminEmails);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/insufficient-credits
+ * @desc    Send insufficient credits notification
+ * @access  Private
+ */
+router.post('/insufficient-credits', [
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('creditType').optional().isString().withMessage('Credit type must be a string'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { companyData, creditType = 'job' } = req.body;
+    const result = await notificationController.sendInsufficientCredits(companyData, creditType);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/plan-activated
+ * @desc    Send plan activated notification
+ * @access  Private
+ */
+router.post('/plan-activated', [
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('planData').isObject().notEmpty().withMessage('Plan data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { companyData, planData } = req.body;
+    const result = await notificationController.sendPlanActivated(companyData, planData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @route   POST /api/notifications/custom-plan-lpo
+ * @desc    Send custom plan LPO notification
+ * @access  Private
+ */
+router.post('/custom-plan-lpo', [
+  body('companyData').isObject().notEmpty().withMessage('Company data is required'),
+  body('lpoData').isObject().notEmpty().withMessage('LPO data is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { companyData, lpoData } = req.body;
+    const result = await notificationController.sendCustomPlanLPO(companyData, lpoData);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
 // Health check endpoint (public)
 router.get('/health', (req, res) => {
   res.json({

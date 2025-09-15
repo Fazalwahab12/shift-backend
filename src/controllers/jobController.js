@@ -1,6 +1,7 @@
 const { validationResult } = require('express-validator');
 const Job = require('../models/Job');
 const Company = require('../models/Company');
+const NotificationHelper = require('../utils/notificationHelper');
 
 /**
  * Job Controller - Professional Implementation
@@ -153,6 +154,32 @@ class JobController {
       }
 
       await job.publish();
+
+      // 🔥 AUTO-TRIGGER JOB POSTED NOTIFICATIONS
+      try {
+        const company = await Company.findById(job.companyId);
+        if (company) {
+          const jobData = {
+            id: job.jobId,
+            title: job.title,
+            jobType: job.jobType, // instant-hire or interview-first
+            type: job.jobType
+          };
+
+          const companyData = {
+            id: company.id,
+            name: company.companyName,
+            companyName: company.companyName,
+            email: company.companyEmail
+          };
+
+          await NotificationHelper.triggerJobPosted(jobData, companyData, NotificationHelper.getAdminEmails());
+          console.log('✅ Job posted notifications sent successfully');
+        }
+      } catch (notifError) {
+        console.error('❌ Failed to send job posted notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
 
       res.status(200).json({
         success: true,

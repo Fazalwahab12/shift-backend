@@ -1,5 +1,8 @@
 const OnboardingData = require('../models/OnboardingData');
 const User = require('../models/User');
+const Seeker = require('../models/Seeker');
+const Company = require('../models/Company');
+const notificationController = require('./notificationController');
 const { validationResult } = require('express-validator');
 
 /**
@@ -45,7 +48,11 @@ class OnboardingController {
         
         // Mark user onboarding as completed
         await user.completeOnboarding();
-        
+
+        // Trigger account created notifications
+        await OnboardingController.triggerSeekerAccountCreatedNotification(userId, userType);
+        await OnboardingController.triggerCompanyAccountCreatedNotification(userId, userType);
+
         res.status(200).json({
           success: true,
           message: 'Onboarding data updated successfully',
@@ -60,7 +67,11 @@ class OnboardingController {
         
         // Mark user onboarding as completed
         await user.completeOnboarding();
-        
+
+        // Trigger account created notifications
+        await OnboardingController.triggerSeekerAccountCreatedNotification(userId, userType);
+        await OnboardingController.triggerCompanyAccountCreatedNotification(userId, userType);
+
         res.status(201).json({
           success: true,
           message: 'Onboarding data created successfully',
@@ -73,6 +84,40 @@ class OnboardingController {
 
     } catch (error) {
       console.error('Error in createOrUpdateOnboarding:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get current user's onboarding data
+   * GET /api/onboarding/me
+   */
+  static async getCurrentUserOnboarding(req, res) {
+    try {
+      // Get userId from token (set by auth middleware)
+      const { userId } = req.user;
+
+      const onboardingData = await OnboardingData.findByUserId(userId);
+
+      if (!onboardingData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Onboarding data not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Onboarding data retrieved successfully',
+        data: onboardingData.toPublicJSON()
+      });
+
+    } catch (error) {
+      console.error('Error in getCurrentUserOnboarding:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error',
@@ -535,6 +580,100 @@ class OnboardingController {
         message: 'Internal server error',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
+    }
+  }
+
+  /**
+   * Helper method to trigger account created notifications for seekers (in-app only)
+   */
+  static async triggerSeekerAccountCreatedNotification(userId, userType) {
+    try {
+      // For seekers: Send only in-app notifications using User ID
+      if (userType === 'seeker') {
+        // Get user data
+        const user = await User.findById(userId);
+
+        if (user) {
+          // Send custom in-app only notification using User ID as receiver
+          const notificationService = require('../services/notificationService');
+
+          await notificationService.sendNotification({
+            type: 'job_seeker_profile_created',
+            initiatedBy: 'system',
+            action: 'Profile Created',
+            description: 'Job Seeker registers',
+            receivers: [{
+              id: userId, // Use User ID instead of Seeker profile ID
+              type: 'seeker',
+              email: null // No email needed for in-app only
+            }],
+            channels: ['in-app'], // Only in-app, no email
+            content: {
+              message: 'Your account has been created. Complete your profile to start applying for jobs.',
+              actionUrl: `${process.env.FRONTEND_URL}/seeker/profile/complete`
+            },
+            metadata: {
+              seekerName: 'Job Seeker',
+              userId: userId,
+              userType: userType
+            }
+          });
+
+          console.log('✅ Seeker account created notification (in-app only) sent for user:', userId);
+        } else {
+          console.log('⚠️ User not found:', userId);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error triggering seeker account created notification:', error);
+      // Don't throw - notifications are non-critical
+    }
+  }
+
+  /**
+   * Helper method to trigger account created notifications for companies (in-app only)
+   */
+  static async triggerCompanyAccountCreatedNotification(userId, userType) {
+    try {
+      // For companies: Send only in-app notifications using User ID
+      if (userType === 'company') {
+        // Get user data
+        const user = await User.findById(userId);
+
+        if (user) {
+          // Send custom in-app only notification using User ID as receiver
+          const notificationService = require('../services/notificationService');
+
+          await notificationService.sendNotification({
+            type: 'company_account_created',
+            initiatedBy: 'system',
+            action: 'Company Account Created',
+            description: 'Company completes initial registration',
+            receivers: [{
+              id: userId, // Use User ID instead of Company profile ID
+              type: 'company',
+              email: null // No email needed for in-app only
+            }],
+            channels: ['in-app'], // Only in-app, no email
+            content: {
+              message: 'Welcome to Shift! Your company account is ready. Complete your profile to start hiring smarter.',
+              actionUrl: `${process.env.FRONTEND_URL}/company/profile/complete`
+            },
+            metadata: {
+              companyName: 'Company',
+              userId: userId,
+              userType: userType
+            }
+          });
+
+          console.log('✅ Company account created notification (in-app only) sent for user:', userId);
+        } else {
+          console.log('⚠️ User not found:', userId);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error triggering company account created notification:', error);
+      // Don't throw - notifications are non-critical
     }
   }
 

@@ -4,6 +4,7 @@ const Company = require('../models/Company');
 const Job = require('../models/Job');
 const Seeker = require('../models/Seeker');
 const { validationResult } = require('express-validator');
+const notificationController = require('./notificationController');
 
 /**
  * Interview Controller
@@ -66,6 +67,32 @@ class InterviewController {
           interviewScheduled: true,
           statusChangedAt: new Date().toISOString()
         });
+      }
+
+      // 🔥 AUTO-TRIGGER INTERVIEW REQUEST NOTIFICATIONS
+      try {
+        const interviewNotificationData = {
+          jobSeekerName: interviewData.seekerName,
+          jobSeekerEmail: interviewData.seekerEmail,
+          jobSeekerId: application.seekerId,
+          companyName: company.companyName,
+          companyId: company.id,
+          jobTitle: interviewData.jobTitle,
+          jobId: application.jobId,
+          interviewDate: interview.scheduledDate,
+          location: interview.location || interview.interviewMode
+        };
+
+        // Send interview request notification to job seeker
+        await notificationController.sendInterviewRequest(interviewNotificationData);
+        
+        // Send confirmation to company
+        await notificationController.sendInterviewRequestToCompany(interviewNotificationData, company);
+        
+        console.log('✅ Interview request notifications sent successfully');
+      } catch (notifError) {
+        console.error('❌ Failed to send interview request notifications:', notifError);
+        // Don't fail the main request for notification errors
       }
 
       res.status(201).json({
@@ -318,6 +345,41 @@ class InterviewController {
       }
 
       const rescheduledInterview = await interview.reschedule(newDate, newTime, reason);
+
+      // 🔥 AUTO-TRIGGER INTERVIEW RESCHEDULED NOTIFICATIONS  
+      try {
+        const company = await Company.findById(interview.companyId);
+        const seeker = await Seeker.findById(interview.seekerId);
+        
+        if (company && seeker) {
+          const interviewData = {
+            jobTitle: interview.jobTitle,
+            jobId: interview.jobId,
+            id: interview.id,
+            newInterviewDate: rescheduledInterview.scheduledDate
+          };
+
+          const companyData = {
+            id: company.id,
+            name: company.companyName,
+            email: company.companyEmail
+          };
+
+          const seekerData = {
+            id: seeker.id,
+            name: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+            fullName: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+            email: seeker.email,
+            phone: seeker.phone
+          };
+
+          await notificationController.sendInterviewRescheduled(interviewData, companyData, seekerData);
+          console.log('✅ Interview rescheduled notifications sent successfully');
+        }
+      } catch (notifError) {
+        console.error('❌ Failed to send interview rescheduled notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
 
       res.json({
         success: true,

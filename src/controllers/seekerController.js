@@ -4,6 +4,8 @@ const User = require('../models/User');
 const OnboardingData = require('../models/OnboardingData');
 const { validationResult } = require('express-validator');
 const { databaseService, COLLECTIONS } = require('../config/database');
+const notificationController = require('./notificationController');
+const NotificationHelper = require('../utils/notificationHelper');
 
 /**
  * Seeker Profile Controller
@@ -68,6 +70,24 @@ class SeekerController {
       } else {
         // Create profile without onboarding data
         newSeeker = await Seeker.create(userId, profileData);
+      }
+
+      // 🔥 AUTO-TRIGGER NOTIFICATIONS
+      try {
+        // Send job seeker profile created notifications
+        await NotificationHelper.triggerJobSeekerProfileCreated({
+          id: newSeeker.id,
+          userId: userId,
+          email: user.email || profileData.email,
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          name: `${profileData.firstName} ${profileData.lastName}`
+        }, NotificationHelper.getAdminEmails());
+
+        console.log('✅ Job seeker profile created notifications sent');
+      } catch (notifError) {
+        console.error('❌ Failed to send profile created notifications:', notifError);
+        // Don't fail the main request for notification errors
       }
 
       res.status(201).json({
@@ -246,6 +266,24 @@ class SeekerController {
         const user = await User.findById(seeker.userId);
         if (user) {
           await user.completeProfile();
+
+          // 🔥 AUTO-TRIGGER PROFILE COMPLETED NOTIFICATIONS
+          try {
+            const seekerData = {
+              id: seeker.id,
+              userId: seeker.userId,
+              email: user.email || seeker.email,
+              firstName: seeker.firstName,
+              lastName: seeker.lastName,
+              fullName: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`
+            };
+
+            await NotificationHelper.triggerJobSeekerProfileCompleted(seekerData, NotificationHelper.getAdminEmails());
+            console.log('✅ Job seeker profile completed notifications sent successfully');
+          } catch (notifError) {
+            console.error('❌ Failed to send profile completed notifications:', notifError);
+            // Don't fail the main request for notification errors
+          }
         }
       }
 

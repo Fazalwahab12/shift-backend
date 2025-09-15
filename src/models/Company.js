@@ -925,7 +925,14 @@ class Company {
   calculateRemainingDays() {
     const now = new Date();
     const trialStart = new Date(this.trialStartAt);
-    const daysPassed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
+
+    // Set both dates to start of day for accurate day calculation
+    const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDay = new Date(trialStart.getFullYear(), trialStart.getMonth(), trialStart.getDate());
+
+    const daysPassed = Math.floor((nowDay - startDay) / (1000 * 60 * 60 * 24));
+
+    // On same day (daysPassed = 0), should show 14 days remaining
     return Math.max(0, 14 - daysPassed);
   }
 
@@ -951,8 +958,12 @@ class Company {
       const now = new Date();
       const trialStart = new Date(this.trialStartAt);
       const trialEnd = new Date(this.trialEndDate);
-      
-      const daysPassed = Math.floor((now - trialStart) / (1000 * 60 * 60 * 24));
+
+      // Set both dates to start of day for accurate day calculation
+      const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startDay = new Date(trialStart.getFullYear(), trialStart.getMonth(), trialStart.getDate());
+
+      const daysPassed = Math.floor((nowDay - startDay) / (1000 * 60 * 60 * 24));
       const daysRemaining = Math.max(0, 14 - daysPassed);
       
       const updateData = {
@@ -1665,6 +1676,7 @@ class Company {
       // Inherit data from onboarding
       const profileData = {
         userId: userId,
+        trialStartAt: new Date().toISOString(), // Set trial start date
         primaryIndustry: onboardingData.selectedIndustries[0] || null,
         secondaryIndustries: onboardingData.selectedIndustries.slice(1) || [],
         typicalHiringRoles: onboardingData.typicalHiringRoles || onboardingData.selectedRoles,
@@ -1674,7 +1686,12 @@ class Company {
 
       const company = new Company(profileData);
       const result = await databaseService.create(COLLECTIONS.COMPANIES, company.toJSON());
-      return new Company({ id: result.id, ...result });
+      const createdCompany = new Company({ id: result.id, ...result });
+
+      // Calculate trial days remaining after creation
+      await createdCompany.updateTrialStatus();
+
+      return createdCompany;
     } catch (error) {
       console.error('Error creating company profile from onboarding:', error);
       throw error;

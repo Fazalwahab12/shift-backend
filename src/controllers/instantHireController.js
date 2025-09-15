@@ -4,6 +4,7 @@ const Company = require('../models/Company');
 const Job = require('../models/Job');
 const Seeker = require('../models/Seeker');
 const { validationResult } = require('express-validator');
+const notificationController = require('./notificationController');
 
 /**
  * InstantHire Controller
@@ -329,6 +330,36 @@ class InstantHireController {
         seekerPhone: seeker.phone
       });
 
+      // 🔥 AUTO-TRIGGER CANDIDATE HIRED NOTIFICATIONS
+      try {
+        const hiringData = {
+          jobTitle: instantHire.jobTitle,
+          jobId: instantHire.jobId,
+          id: instantHire.id
+        };
+
+        const seekerData = {
+          id: seeker.id,
+          name: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+          fullName: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+          email: seeker.email,
+          phone: seeker.phone
+        };
+
+        const companyData = {
+          id: company.id,
+          name: company.companyName,
+          email: company.companyEmail
+        };
+
+        // Send hiring offer to seeker (with acceptance option)
+        await notificationController.sendCandidateHired(hiringData, seekerData, companyData);
+        console.log('✅ Candidate hired notifications sent successfully');
+      } catch (notifError) {
+        console.error('❌ Failed to send candidate hired notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
+
       res.json({
         success: true,
         message: 'Instant hire matched with seeker successfully',
@@ -372,6 +403,38 @@ class InstantHireController {
       }
 
       const acceptedHire = await instantHire.acceptBySeeker();
+
+      // 🔥 AUTO-TRIGGER HIRING ACCEPTANCE NOTIFICATIONS
+      try {
+        const company = await Company.findById(instantHire.companyId);
+        
+        if (company) {
+          const hiringData = {
+            jobTitle: instantHire.jobTitle,
+            jobId: instantHire.jobId,
+            id: instantHire.id
+          };
+
+          const seekerData = {
+            id: seeker.id,
+            name: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+            fullName: seeker.fullName || `${seeker.firstName} ${seeker.lastName}`,
+            email: seeker.email
+          };
+
+          const companyData = {
+            id: company.id,
+            name: company.companyName,
+            email: company.companyEmail
+          };
+
+          await notificationController.sendHiringAcceptance(hiringData, companyData, seekerData);
+          console.log('✅ Hiring acceptance notifications sent successfully');
+        }
+      } catch (notifError) {
+        console.error('❌ Failed to send hiring acceptance notifications:', notifError);
+        // Don't fail the main request for notification errors
+      }
 
       res.json({
         success: true,

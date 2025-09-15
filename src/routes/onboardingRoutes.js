@@ -87,6 +87,15 @@ router.get('/popular-roles', [
 ], OnboardingController.getPopularRoles);
 
 /**
+ * @route   GET /api/onboarding/me
+ * @desc    Get current user's onboarding data (token-based)
+ * @access  Private
+ */
+router.get('/me', [
+  authenticateToken
+], OnboardingController.getCurrentUserOnboarding);
+
+/**
  * @route   GET /api/onboarding/:userId
  * @desc    Get onboarding data by user ID
  * @access  Public

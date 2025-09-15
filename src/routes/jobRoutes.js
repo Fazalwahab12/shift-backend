@@ -37,6 +37,14 @@ router.post('/', authenticateToken, [
     .optional()
     .isLength({ min: 1, max: 100 })
     .withMessage('Role name must be between 1 and 100 characters'),
+  body('industries')
+    .optional()
+    .isArray()
+    .withMessage('Industries must be an array'),
+  body('industries.*')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Each industry name must be between 1 and 100 characters'),
   body('jobSummary')
     .optional()
     .isLength({ max: 1000 })

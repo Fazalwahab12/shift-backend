@@ -71,7 +71,36 @@ router.post('/', authenticateToken, [
   body('geographicalPresence')
     .optional()
     .isIn(['Local', 'Regional', 'Global'])
-    .withMessage('Geographical presence must be Local, Regional, or Global')
+    .withMessage('Geographical presence must be Local, Regional, or Global'),
+  // Brands validation
+  body('brands')
+    .optional()
+    .isArray()
+    .withMessage('Brands must be an array'),
+  body('brands.*.name')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand name must be between 1 and 100 characters'),
+  body('brands.*.industry')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand industry must be between 1 and 100 characters'),
+  body('brands.*.role')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand role must be between 1 and 100 characters'),
+  body('brands.*.skills')
+    .optional()
+    .isArray()
+    .withMessage('Brand skills must be an array'),
+  body('brands.*.skills.*')
+    .optional()
+    .isString()
+    .withMessage('Each skill must be a string'),
+  body('brands.*.logo')
+    .optional()
+    .isString()
+    .withMessage('Brand logo must be a string (URL)')
 ], CompanyController.createProfile);
 
 /**
@@ -153,7 +182,36 @@ router.put('/:companyId', authenticateToken, [
   body('geographicalPresence')
     .optional()
     .isIn(['Local', 'Regional', 'Global'])
-    .withMessage('Geographical presence must be Local, Regional, or Global')
+    .withMessage('Geographical presence must be Local, Regional, or Global'),
+  // Brands validation
+  body('brands')
+    .optional()
+    .isArray()
+    .withMessage('Brands must be an array'),
+  body('brands.*.name')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand name must be between 1 and 100 characters'),
+  body('brands.*.industry')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand industry must be between 1 and 100 characters'),
+  body('brands.*.role')
+    .optional()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Brand role must be between 1 and 100 characters'),
+  body('brands.*.skills')
+    .optional()
+    .isArray()
+    .withMessage('Brand skills must be an array'),
+  body('brands.*.skills.*')
+    .optional()
+    .isString()
+    .withMessage('Each skill must be a string'),
+  body('brands.*.logo')
+    .optional()
+    .isString()
+    .withMessage('Brand logo must be a string (URL)')
 ], CompanyController.updateProfile);
 
 /**
@@ -1350,5 +1408,40 @@ router.get('/brands/:brandId/details', [
     .notEmpty()
     .withMessage('Brand ID is required')
 ], CompanyController.getBrandDetails);
+
+/**
+ * @route   GET /api/companies/:companyId/applications
+ * @desc    Get applications for a company with filtering (including upcoming interviews)
+ * @access  Private (Company)
+ */
+router.get('/:companyId/applications', authenticateToken, [
+  param('companyId')
+    .notEmpty()
+    .withMessage('Company ID is required'),
+  query('jobType')
+    .optional()
+    .isString()
+    .withMessage('jobType must be a string'),
+  query('fromDate')
+    .optional()
+    .isISO8601()
+    .withMessage('fromDate must be a valid ISO date'),
+  query('toDate')
+    .optional()
+    .isISO8601()
+    .withMessage('toDate must be a valid ISO date'),
+  query('status')
+    .optional()
+    .isString()
+    .withMessage('status must be a string'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Limit must be between 1 and 100'),
+  query('offset')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Offset must be 0 or greater')
+], CompanyController.getCompanyApplications);
 
 module.exports = router;

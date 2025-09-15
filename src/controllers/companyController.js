@@ -3,6 +3,7 @@ const User = require('../models/User');
 const OnboardingData = require('../models/OnboardingData');
 const { validationResult } = require('express-validator');
 const notificationController = require('./notificationController');
+const NotificationHelper = require('../utils/notificationHelper');
 
 /**
  * Company Profile Controller
@@ -87,8 +88,8 @@ class CompanyController {
           email: newCompany.companyEmail || user.email
         };
         
-        // Send company account created notification
-        await notificationController.sendCompanyAccountCreated(companyData);
+        // Send company account created notification using helper
+        await NotificationHelper.triggerCompanyAccountCreated(companyData, NotificationHelper.getAdminEmails());
         console.log('✅ Company creation notification sent successfully');
       } catch (notificationError) {
         console.error('⚠️  Failed to send company creation notification:', notificationError);
@@ -272,6 +273,23 @@ class CompanyController {
         const user = await User.findById(company.userId);
         if (user) {
           await user.completeProfile();
+
+          // 🔥 AUTO-TRIGGER PROFILE COMPLETED NOTIFICATIONS
+          try {
+            const companyData = {
+              id: company.id,
+              userId: company.userId,
+              name: company.companyName,
+              companyName: company.companyName,
+              email: user.email || company.companyEmail
+            };
+
+            await NotificationHelper.triggerCompanyProfileCompleted(companyData, NotificationHelper.getAdminEmails());
+            console.log('✅ Company profile completed notifications sent successfully');
+          } catch (notifError) {
+            console.error('❌ Failed to send profile completed notifications:', notifError);
+            // Don't fail the main request for notification errors
+          }
         }
       }
 
@@ -3538,6 +3556,301 @@ class CompanyController {
       res.status(500).json({
         success: false,
         message: 'Failed to check interview limits',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Update profile step
+   * PUT /api/companies/:companyId/step/:step
+   */
+  static async updateProfileStep(req, res) {
+    try {
+      const { companyId, step } = req.params;
+      const stepData = req.body;
+      const userId = req.user.userId;
+
+      // Verify the company belongs to the authenticated user
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found'
+        });
+      }
+
+      if (company.userId !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only update your own company profile.'
+        });
+      }
+
+      const stepNumber = parseInt(step);
+
+      // Handle different steps
+      switch (stepNumber) {
+        case 2:
+          // Step 2: Brands and onboarding data
+          const updateData = {
+            profileCompletionStep: Math.max(company.profileCompletionStep || 1, 2)
+          };
+
+          // Handle brands if provided
+          if (stepData.brands && Array.isArray(stepData.brands)) {
+            updateData.brands = stepData.brands;
+          }
+
+          // Handle onboarding data if provided
+          if (stepData.selectedIndustries || stepData.selectedRoles || stepData.selectedSkills) {
+            try {
+              // Update or create onboarding data
+              const onboardingData = await OnboardingData.findByUserId(userId);
+              if (onboardingData) {
+                await onboardingData.update({
+                  selectedIndustries: stepData.selectedIndustries || onboardingData.selectedIndustries,
+                  selectedRoles: stepData.selectedRoles || onboardingData.selectedRoles,
+                  selectedSkills: stepData.selectedSkills || onboardingData.selectedSkills
+                });
+              } else {
+                await OnboardingData.create({
+                  userId: userId,
+                  userType: 'company',
+                  selectedIndustries: stepData.selectedIndustries || [],
+                  selectedRoles: stepData.selectedRoles || [],
+                  selectedSkills: stepData.selectedSkills || []
+                });
+              }
+              console.log('Step 2 - Updated onboarding data successfully');
+            } catch (onboardingError) {
+              console.error('Step 2 - Error updating onboarding data:', onboardingError);
+              // Continue with company profile update even if onboarding update fails
+            }
+          }
+
+          await company.update(updateData);
+          break;
+
+        case 3:
+          // Step 3: Location and team data
+          await company.update({
+            ...stepData,
+            profileCompletionStep: Math.max(company.profileCompletionStep || 1, 3)
+          });
+          break;
+
+        case 4:
+          // Step 4: Plan selection
+          await company.update({
+            ...stepData.stepData,
+            profileCompletionStep: Math.max(company.profileCompletionStep || 1, 4)
+          });
+          break;
+
+        case 5:
+          // Step 5: Terms and conditions
+          await company.update({
+            ...stepData.stepData,
+            profileCompletionStep: Math.max(company.profileCompletionStep || 1, 5)
+          });
+          break;
+
+        case 6:
+          // Step 6: Final confirmation
+          await company.update({
+            ...stepData.stepData,
+            profileCompletionStep: 6,
+            isProfileComplete: true
+          });
+          break;
+
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid step number'
+          });
+      }
+
+      // Return updated company profile
+      const updatedCompany = await Company.findById(companyId);
+
+      res.status(200).json({
+        success: true,
+        message: `Step ${step} updated successfully`,
+        data: updatedCompany.toJSON()
+      });
+
+    } catch (error) {
+      console.error('Error in updateProfileStep:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update profile step',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Get company applications with interview filtering
+   * GET /api/companies/:companyId/applications
+   */
+  static async getCompanyApplications(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { userId, userType } = req.user;
+      const {
+        jobType,
+        fromDate,
+        toDate,
+        status,
+        limit = 50,
+        offset = 0
+      } = req.query;
+
+
+      // Verify user is a company
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Only companies can view applications'
+        });
+      }
+
+      // Verify user owns the company or is associated with it
+      const company = await Company.findById(companyId);
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Check if user has access to this company
+      const userCompany = await Company.findByUserId(userId);
+      if (!userCompany || userCompany.id !== companyId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied to this company'
+        });
+      }
+
+      const JobApplication = require('../models/JobApplication');
+      const { databaseService, COLLECTIONS } = require('../config/database');
+
+      // Build query filters
+      let filters = [
+        { field: 'companyId', operator: '==', value: companyId }
+      ];
+
+      // Add status filter if provided
+      if (status) {
+        filters.push({ field: 'status', operator: '==', value: status });
+      }
+
+      // Query all applications for this company
+      let applications = await databaseService.query(
+        COLLECTIONS.JOB_APPLICATIONS,
+        filters,
+        { field: 'createdAt', direction: 'desc' },
+        parseInt(limit) * 2, // Get more to filter later
+        parseInt(offset)
+      );
+
+
+      // Convert to JobApplication objects and populate data
+      applications = await Promise.all(
+        applications.map(async (appData) => {
+          const app = new JobApplication(appData);
+          await app.populateData();
+          return app;
+        })
+      );
+
+      // Filter by job type if requested (e.g., "Interview First")
+      if (jobType) {
+        applications = applications.filter(app => {
+          const appJobType = app.jobData?.jobType || app.jobData?.hiringType || app.hiringType;
+          return appJobType === jobType;
+        });
+      }
+
+      // Filter by date range if provided
+      if (fromDate) {
+        const fromDateTime = new Date(fromDate);
+        applications = applications.filter(app => {
+          if (app.interviewDate) {
+            const interviewDateTime = new Date(app.interviewDate);
+            return interviewDateTime >= fromDateTime;
+          }
+          return false;
+        });
+      }
+
+      if (toDate) {
+        const toDateTime = new Date(toDate);
+        applications = applications.filter(app => {
+          if (app.interviewDate) {
+            const interviewDateTime = new Date(app.interviewDate);
+            return interviewDateTime <= toDateTime;
+          }
+          return false;
+        });
+      }
+
+      // Apply pagination after filtering
+      const paginatedApplications = applications.slice(0, parseInt(limit));
+
+      // Filter to only include applications with scheduled interviews for upcoming interviews endpoint
+      const interviewApplications = paginatedApplications.filter(app =>
+        app.interviewScheduled === true && app.interviewDate && app.interviewTime
+      );
+
+      // Format response to match expected structure for interviews
+      const formattedApplications = interviewApplications.map(app => {
+        const applicationData = app.toJSON();
+
+        return {
+          ...applicationData,
+          id: app.id,
+          applicationId: app.applicationId || app.id,
+          jobId: app.jobId,
+          seekerId: app.seekerId,
+          companyId: app.companyId,
+          seekerName: app.seekerName || app.seekerData?.fullName || 'Unknown',
+          seekerEmail: app.seekerEmail || app.seekerData?.email || '',
+          jobTitle: app.jobTitle || app.jobData?.roleName || 'Unknown Position',
+          interviewDate: app.interviewDate,
+          interviewTime: app.interviewTime,
+          interviewEndTime: app.interviewEndTime,
+          interviewDuration: app.interviewDuration || 30,
+          interviewType: app.interviewType || 'in-person',
+          interviewLocation: app.interviewLocation || app.location,
+          interviewStatus: app.interviewStatus || 'scheduled',
+          interviewResponse: app.interviewResponse,
+          seekerData: app.seekerData,
+          jobData: app.jobData
+        };
+      });
+
+
+      res.status(200).json({
+        success: true,
+        message: 'Company applications retrieved successfully',
+        data: {
+          applications: formattedApplications,
+          totalCount: applications.length,
+          limit: parseInt(limit),
+          offset: parseInt(offset),
+          hasMore: applications.length > parseInt(limit)
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting company applications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve company applications',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

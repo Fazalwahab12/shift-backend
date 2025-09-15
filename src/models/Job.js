@@ -15,6 +15,7 @@ class Job {
     this.brandLocationId = data.brandLocationId || null; // Selected store/location ID
     this.roleId = data.roleId || null; // Selected role ID
     this.roleName = data.roleName || null; // Role display name
+    this.industries = data.industries || []; // Array of industry names from onboarding
     this.jobCoverImage = data.jobCoverImage || null; // Upload image URL
     this.jobSummary = data.jobSummary || null; // Job description
     this.dressCode = data.dressCode || null; // Dress code description
@@ -279,6 +280,7 @@ class Job {
       brandLocationId: this.brandLocationId,
       roleId: this.roleId,
       roleName: this.roleName,
+      industries: this.industries,
       jobCoverImage: this.jobCoverImage,
       jobSummary: this.jobSummary,
       dressCode: this.dressCode,
@@ -328,6 +330,7 @@ class Job {
       id: this.id,
       jobId: this.jobId,
       roleName: this.roleName,
+      industries: this.industries,
       companyName: this.companyName,
       brandName: this.brandName,
       locationAddress: this.locationAddress,

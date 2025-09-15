@@ -1076,6 +1076,1016 @@ class NotificationController {
       throw error;
     }
   }
+
+  /**
+   * Send admin creates company account notification
+   */
+  async sendAdminCreateCompanyAccount(companyData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'admin_company_created',
+        initiatedBy: 'admin',
+        action: 'Admin Creates Company Account',
+        description: 'Admin creates company account',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['email'],
+        content: {
+          message: 'Your Account has been created. Complete your profile to start hiring smarter.',
+          actionUrl: `${process.env.FRONTEND_URL}/company/profile/complete`
+        },
+        metadata: {
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send admin create company account notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send job edited notification
+   */
+  async sendJobEdited(jobData, companyData, adminEmails = []) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'job_edited_company',
+        initiatedBy: 'company',
+        action: 'Job Edited',
+        description: 'Company edits job post',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `Your job '${jobData.title}' has been updated. View the changes.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/jobs/${jobData.id}`
+        },
+        metadata: {
+          jobTitle: jobData.title,
+          jobId: jobData.id,
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+
+      // Send to admins
+      if (adminEmails.length > 0) {
+        await notificationService.sendNotification({
+          type: 'admin_job_edited',
+          initiatedBy: 'company',
+          action: 'Job Edited',
+          description: 'Company edits job post',
+          receivers: adminEmails.map(email => ({
+            id: `admin_${email}`,
+            type: 'admin',
+            email
+          })),
+          channels: ['in-app'],
+          content: {
+            message: `Job '${jobData.title}' by ${companyData.name} has been updated.`,
+            actionUrl: `${process.env.ADMIN_URL || process.env.FRONTEND_URL}/admin/jobs/${jobData.id}`
+          },
+          metadata: {
+            jobTitle: jobData.title,
+            jobId: jobData.id,
+            companyName: companyData.name,
+            companyId: companyData.id
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Send job edited notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send job cancelled notification
+   */
+  async sendJobCancelled(jobData, companyData, adminEmails = []) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'job_cancelled_company',
+        initiatedBy: 'company',
+        action: 'Job Cancelled',
+        description: 'Company cancels job',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `Your job '${jobData.title}' has been cancelled and is no longer visible to job seekers.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/jobs`
+        },
+        metadata: {
+          jobTitle: jobData.title,
+          jobId: jobData.id,
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+
+      // Send to admins
+      if (adminEmails.length > 0) {
+        await notificationService.sendNotification({
+          type: 'admin_job_cancelled',
+          initiatedBy: 'company',
+          action: 'Job Cancelled',
+          description: 'Company cancels job',
+          receivers: adminEmails.map(email => ({
+            id: `admin_${email}`,
+            type: 'admin',
+            email
+          })),
+          channels: ['in-app'],
+          content: {
+            message: `Job '${jobData.title}' by ${companyData.name} has been cancelled.`,
+            actionUrl: `${process.env.ADMIN_URL || process.env.FRONTEND_URL}/admin/jobs/${jobData.id}`
+          },
+          metadata: {
+            jobTitle: jobData.title,
+            jobId: jobData.id,
+            companyName: companyData.name,
+            companyId: companyData.id
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Send job cancelled notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send interview request sent to company notification
+   */
+  async sendInterviewRequestToCompany(interviewData, companyData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'interview_request_company',
+        initiatedBy: 'company',
+        action: 'Interview Request Sent',
+        description: 'Company invites candidate',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `Interview request sent to ${interviewData.jobSeekerName} for '${interviewData.jobTitle}'.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/interviews/${interviewData.id}`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: interviewData.jobSeekerName,
+          seekerId: interviewData.jobSeekerId,
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send interview request to company notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send payment failed notification
+   */
+  async sendPaymentFailed(paymentData, adminEmails = []) {
+    try {
+      const { companyId, companyEmail, companyName, amount, currency, planName, error } = paymentData;
+
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'payment_failed',
+        initiatedBy: 'system',
+        action: 'Payment Failed',
+        description: 'Payment failed',
+        receivers: [{
+          id: companyId,
+          type: 'company',
+          email: companyEmail
+        }],
+        channels: ['email', 'in-app'],
+        content: {
+          message: `❌ Payment for ${planName} failed. Please retry or use another method.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/billing/retry`
+        },
+        metadata: {
+          amount,
+          currency,
+          planName,
+          companyName,
+          companyId,
+          error: error || 'Payment processing failed'
+        }
+      });
+
+      // Send to admins
+      if (adminEmails.length > 0) {
+        await notificationService.sendNotification({
+          type: 'admin_payment_failed',
+          initiatedBy: 'system',
+          action: 'Payment Failed',
+          description: 'Payment failed',
+          receivers: adminEmails.map(email => ({
+            id: `admin_${email}`,
+            type: 'admin',
+            email
+          })),
+          channels: ['email', 'in-app'],
+          content: {
+            message: `Payment failed for ${companyName} on ${planName}`,
+            actionUrl: `${process.env.ADMIN_URL || process.env.FRONTEND_URL}/admin/payments`
+          },
+          metadata: {
+            amount,
+            currency,
+            planName,
+            companyName,
+            companyId,
+            error: error || 'Payment processing failed'
+          }
+        });
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.error('❌ Send payment failed notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send interview declined notification
+   */
+  async sendInterviewDeclined(interviewData, companyData, seekerData) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'interview_declined_company',
+        initiatedBy: 'job_seeker',
+        action: 'Interview Declined',
+        description: 'Job Seeker declines interview',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `${seekerData.name || seekerData.fullName} has declined the interview request for '${interviewData.jobTitle}'.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/interviews/${interviewData.id}`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name
+        }
+      });
+
+      // Send to job seeker
+      await notificationService.sendNotification({
+        type: 'interview_declined_seeker',
+        initiatedBy: 'job_seeker',
+        action: 'Interview Declined',
+        description: 'Job Seeker declines interview',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `You have declined the interview for '${interviewData.jobTitle}'.`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/interviews`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send interview declined notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send interview rescheduled notification
+   */
+  async sendInterviewRescheduled(interviewData, companyData, seekerData) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'interview_rescheduled_company',
+        initiatedBy: 'company',
+        action: 'Interview Rescheduled',
+        description: 'Company reschedules interview',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'whatsapp'],
+        content: {
+          message: `Interview for '${interviewData.jobTitle}' has been rescheduled.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/interviews/${interviewData.id}`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name,
+          newInterviewDate: interviewData.newInterviewDate
+        }
+      });
+
+      // Send to job seeker
+      await notificationService.sendNotification({
+        type: 'interview_rescheduled_seeker',
+        initiatedBy: 'company',
+        action: 'Interview Rescheduled',
+        description: 'Company reschedules interview',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `Your interview for '${interviewData.jobTitle}' has been rescheduled. View new time.`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/interviews/${interviewData.id}`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name,
+          newInterviewDate: interviewData.newInterviewDate
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send interview rescheduled notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send interview reminder notification
+   */
+  async sendInterviewReminder(interviewData, seekerData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'interview_reminder',
+        initiatedBy: 'system',
+        action: 'Interview Reminder',
+        description: 'Reminder: Interview in 4 hours',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app', 'email', 'whatsapp'],
+        content: {
+          message: `Your interview for '${interviewData.jobTitle}' is in 4 hours. Be prepared!`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/interviews/${interviewData.id}`
+        },
+        metadata: {
+          jobTitle: interviewData.jobTitle,
+          jobId: interviewData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: interviewData.companyName,
+          interviewDate: interviewData.interviewDate,
+          reminderType: 'interview_4_hours'
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send interview reminder notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send instant hire reminder notification
+   */
+  async sendInstantHireReminder(jobData, seekerData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'instant_hire_reminder',
+        initiatedBy: 'system',
+        action: 'Instant Hire Reminder',
+        description: 'Reminder: Your Job Starts in 4 hours',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app', 'email', 'whatsapp'],
+        content: {
+          message: `Your Job '${jobData.title}' is in 4 hours. Be prepared!`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/jobs/${jobData.id}`
+        },
+        metadata: {
+          jobTitle: jobData.title,
+          jobId: jobData.id,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: jobData.companyName,
+          startDate: jobData.startDate,
+          reminderType: 'instant_hire_4_hours'
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send instant hire reminder notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send hiring acceptance notification
+   */
+  async sendHiringAcceptance(hiringData, companyData, seekerData) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'hiring_acceptance_company',
+        initiatedBy: 'job_seeker',
+        action: 'Hiring Acceptance',
+        description: 'Job Seeker Approved Hiring',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `${seekerData.name || seekerData.fullName} has accepted your offer for '${hiringData.jobTitle}'.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/hires/${hiringData.id}`
+        },
+        metadata: {
+          jobTitle: hiringData.jobTitle,
+          jobId: hiringData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+
+      // Send to job seeker
+      await notificationService.sendNotification({
+        type: 'hiring_acceptance_seeker',
+        initiatedBy: 'job_seeker',
+        action: 'Hiring Acceptance',
+        description: 'Job Seeker Approved Hiring',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app', 'email', 'whatsapp'],
+        content: {
+          message: `You've been hired for '${hiringData.jobTitle}' at ${companyData.name}. View more details and special instructions.`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/offers/${hiringData.id}`
+        },
+        metadata: {
+          jobTitle: hiringData.jobTitle,
+          jobId: hiringData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: companyData.name,
+          companyId: companyData.id
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send hiring acceptance notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send no-show notification to job seeker
+   */
+  async sendNoShowToSeeker(reportData, seekerData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'no_show_seeker',
+        initiatedBy: 'admin',
+        action: 'No Show Reported',
+        description: 'Company reports no-show',
+        receivers: [{
+          id: seekerData.id,
+          type: 'seeker',
+          email: seekerData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `You missed the interview/job for '${reportData.jobTitle}'. View our Strike System and what this means for you.`,
+          actionUrl: `${process.env.FRONTEND_URL}/seeker/strikes`
+        },
+        metadata: {
+          jobTitle: reportData.jobTitle,
+          jobId: reportData.jobId,
+          seekerName: seekerData.name || seekerData.fullName,
+          seekerId: seekerData.id,
+          companyName: reportData.companyName,
+          reportDate: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send no-show to seeker notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send profile incomplete reminder notifications
+   */
+  async sendProfileIncompleteReminder(userData, userType, adminEmails = []) {
+    try {
+      if (userType === 'seeker') {
+        await notificationService.sendNotification({
+          type: 'profile_incomplete_reminder_seeker',
+          initiatedBy: 'admin',
+          action: 'Profile Incomplete Reminder',
+          description: 'Profile still incomplete',
+          receivers: [{
+            id: userData.id,
+            type: 'seeker',
+            email: userData.email
+          }],
+          channels: ['email'],
+          content: {
+            message: 'Your profile isn\'t complete yet. Complete it now to increase your chances of being hired.',
+            actionUrl: `${process.env.FRONTEND_URL}/seeker/profile/complete`
+          },
+          metadata: {
+            seekerName: userData.name || userData.fullName,
+            seekerId: userData.id,
+            reminderType: 'profile_incomplete'
+          }
+        });
+      } else if (userType === 'company') {
+        await notificationService.sendNotification({
+          type: 'profile_incomplete_reminder_company',
+          initiatedBy: 'admin',
+          action: 'Profile Incomplete Reminder',
+          description: 'Profile still incomplete',
+          receivers: [{
+            id: userData.id,
+            type: 'company',
+            email: userData.email
+          }],
+          channels: ['email'],
+          content: {
+            message: 'Your Profile still isn\'t complete. Let us know if you need help.',
+            actionUrl: `${process.env.FRONTEND_URL}/company/profile/complete`
+          },
+          metadata: {
+            companyName: userData.name || userData.companyName,
+            companyId: userData.id,
+            reminderType: 'profile_incomplete'
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Send profile incomplete reminder notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send no-show report to admin notification
+   */
+  async sendNoShowReportToAdmin(reportData, adminEmails = []) {
+    try {
+      if (adminEmails.length > 0) {
+        await notificationService.sendNotification({
+          type: 'admin_no_show_reported',
+          initiatedBy: 'company',
+          action: 'No Show Reported',
+          description: 'Company reports no-show',
+          receivers: adminEmails.map(email => ({
+            id: `admin_${email}`,
+            type: 'admin',
+            email
+          })),
+          channels: ['in-app', 'email'],
+          content: {
+            message: `${reportData.companyName} reported ${reportData.seekerName} no-show for '${reportData.jobTitle}'. Support team notified.`,
+            actionUrl: `${process.env.ADMIN_URL || process.env.FRONTEND_URL}/admin/reports/${reportData.id}`
+          },
+          metadata: {
+            jobTitle: reportData.jobTitle,
+            jobId: reportData.jobId,
+            seekerName: reportData.seekerName,
+            seekerId: reportData.seekerId,
+            companyName: reportData.companyName,
+            companyId: reportData.companyId
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Send no-show report to admin notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send trial period ended notification
+   */
+  async sendTrialEnded(companyData, adminEmails = []) {
+    try {
+      // Send to company
+      await notificationService.sendNotification({
+        type: 'trial_ended_company',
+        initiatedBy: 'system',
+        action: 'Trial Ended',
+        description: 'Trial period ended',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: 'Your Trial Period Has Ended. Upgrade your Plan to continue posting jobs and scheduling interviews.',
+          actionUrl: `${process.env.FRONTEND_URL}/company/subscription`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          trialEndDate: new Date().toISOString()
+        }
+      });
+
+      // Send to admins
+      if (adminEmails.length > 0) {
+        await notificationService.sendNotification({
+          type: 'admin_trial_ended',
+          initiatedBy: 'system',
+          action: 'Trial Ended',
+          description: 'Trial period ended',
+          receivers: adminEmails.map(email => ({
+            id: `admin_${email}`,
+            type: 'admin',
+            email
+          })),
+          channels: ['in-app', 'email'],
+          content: {
+            message: `${companyData.name || companyData.companyName} Trial has ended. Contact them for upgrading plan.`,
+            actionUrl: `${process.env.ADMIN_URL || process.env.FRONTEND_URL}/admin/companies/${companyData.id}`
+          },
+          metadata: {
+            companyName: companyData.name || companyData.companyName,
+            companyId: companyData.id,
+            trialEndDate: new Date().toISOString()
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('❌ Send trial ended notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send insufficient subscription/credits notification
+   */
+  async sendInsufficientCredits(companyData, creditType = 'job') {
+    try {
+      await notificationService.sendNotification({
+        type: 'insufficient_credits',
+        initiatedBy: 'system',
+        action: 'Insufficient Credits',
+        description: 'Insufficient subscription/credits',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: creditType === 'job' 
+            ? 'You don\'t have enough credits to post this job. Please upgrade your plan.'
+            : `You have only ${companyData.remainingCredits} ${creditType} credits left. Purchase more to continue.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/subscription`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          creditType,
+          remainingCredits: companyData.remainingCredits || 0
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send insufficient credits notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send download interview schedule reminder
+   */
+  async sendDownloadInterviewSchedule(companyData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'download_interview_schedule',
+        initiatedBy: 'system',
+        action: 'Download Interview Schedule',
+        description: '4 Hours before Interview time',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['email', 'in-app'],
+        content: {
+          message: 'Download Upcoming Interview from Homepage.',
+          actionUrl: `${process.env.FRONTEND_URL}/company/dashboard`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          reminderType: 'interview_schedule'
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send download interview schedule notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send subscription expiring soon notification
+   */
+  async sendSubscriptionExpiring(companyData, daysRemaining = 0) {
+    try {
+      await notificationService.sendNotification({
+        type: 'subscription_expiring',
+        initiatedBy: 'system',
+        action: 'Subscription Expiring',
+        description: 'Subscription expiring soon',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `Your subscription will expire on ${companyData.expiryDate}. Renew now to continue posting jobs.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/subscription/renew`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          daysRemaining,
+          expiryDate: companyData.expiryDate
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send subscription expiring notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send plan expired notification
+   */
+  async sendPlanExpired(companyData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'plan_expired',
+        initiatedBy: 'system',
+        action: 'Plan Expired',
+        description: 'Plan expired',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: 'Your subscription has expired. Renew now to reactivate job postings.',
+          actionUrl: `${process.env.FRONTEND_URL}/company/subscription/renew`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          expiredDate: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send plan expired notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send low credits notification
+   */
+  async sendLowCredits(companyData, creditType = 'interview', remainingCredits = 0) {
+    try {
+      await notificationService.sendNotification({
+        type: 'low_credits',
+        initiatedBy: 'system',
+        action: 'Low Credits',
+        description: 'Low credits',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app'],
+        content: {
+          message: `You have only ${remainingCredits} ${creditType} credits left. Purchase more to continue ${creditType === 'interview' ? 'interviewing' : 'posting jobs'}.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/subscription`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          creditType,
+          remainingCredits
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send low credits notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send plan activated notifications (Starter, Premium, etc.)
+   */
+  async sendPlanActivated(companyData, planData) {
+    try {
+      const planName = planData.name || planData.planName;
+      const planType = planData.type || 'plan';
+      
+      await notificationService.sendNotification({
+        type: `${planType}_activated`,
+        initiatedBy: 'system',
+        action: `${planName} Activated`,
+        description: `${planName} activated after payment`,
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: planType === 'addon' 
+            ? `You have added ${planData.credits} ${planData.creditType} Credits to your Account. Start ${planData.creditType === 'interview' ? 'Organizing Interviews' : 'Posting Jobs'} Today.`
+            : `You have subscribed to ${planName}. ${planType === 'instant_hire' ? 'Create a Job Post Now.' : 'View Plan or Download Invoice.'}`,
+          actionUrl: planType === 'addon' 
+            ? `${process.env.FRONTEND_URL}/company/${planData.creditType === 'interview' ? 'interviews' : 'jobs'}`
+            : `${process.env.FRONTEND_URL}/company/${planType === 'instant_hire' ? 'jobs/create' : 'subscription'}`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          planName,
+          planType,
+          amount: planData.amount,
+          currency: planData.currency || 'OMR',
+          activationDate: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send plan activated notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send custom plan (LPO) notifications
+   */
+  async sendCustomPlanLPO(companyData, lpoData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'custom_plan_lpo',
+        initiatedBy: 'admin',
+        action: 'Custom Plan LPO',
+        description: 'Custom plan created',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `LPO for ${lpoData.planName} received. Your plan is now active.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/dashboard`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          lpoNumber: lpoData.lpoNumber,
+          planName: lpoData.planName,
+          amount: lpoData.amount,
+          currency: lpoData.currency || 'OMR'
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send custom plan LPO notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send payment overdue (30 days) notification
+   */
+  async sendPaymentOverdue(companyData, lpoData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'payment_overdue',
+        initiatedBy: 'admin',
+        action: 'Payment Overdue',
+        description: 'After 30 days without receiving payment',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `Reminder: Payment for your LPO (${lpoData.lpoNumber}) is due on ${lpoData.dueDate}. Please ensure payment is made to avoid delays.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/billing/lpo/${lpoData.lpoNumber}`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          lpoNumber: lpoData.lpoNumber,
+          dueDate: lpoData.dueDate,
+          amount: lpoData.amount,
+          currency: lpoData.currency || 'OMR'
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send payment overdue notification failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send LPO payment received notification
+   */
+  async sendLPOPaymentReceived(companyData, lpoData) {
+    try {
+      await notificationService.sendNotification({
+        type: 'lpo_payment_received',
+        initiatedBy: 'admin',
+        action: 'LPO Payment Received',
+        description: 'Payment received, payment info added to payment history',
+        receivers: [{
+          id: companyData.id,
+          type: 'company',
+          email: companyData.email
+        }],
+        channels: ['in-app', 'email'],
+        content: {
+          message: `Payment for LPO ${lpoData.lpoNumber} received. Thank you.`,
+          actionUrl: `${process.env.FRONTEND_URL}/company/billing/receipt/${lpoData.paymentId}`
+        },
+        metadata: {
+          companyName: companyData.name || companyData.companyName,
+          companyId: companyData.id,
+          lpoNumber: lpoData.lpoNumber,
+          paymentId: lpoData.paymentId,
+          amount: lpoData.amount,
+          currency: lpoData.currency || 'OMR',
+          paymentDate: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      logger.error('❌ Send LPO payment received notification failed:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new NotificationController();

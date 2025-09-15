@@ -5,6 +5,7 @@
  */
 
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const firebaseConfig = require('../config/firebase');
 const { COLLECTIONS, NOTIFICATION_TYPES } = require('../config/constants');
 const EmailHistory = require('../models/EmailHistory');
@@ -30,6 +31,19 @@ class NotificationService {
     } else {
       this.transporter = null;
       logger.warn('📧 Email transporter not configured - emails will be logged only');
+    }
+
+    // Setup WhatsApp integration
+    this.whatsappConfig = {
+      apiUrl: process.env.WHATSAPP_API_URL,
+      apiKey: process.env.WHATSAPP_API_KEY,
+      enabled: process.env.WHATSAPP_ENABLED === 'true'
+    };
+
+    if (this.whatsappConfig.enabled && this.whatsappConfig.apiUrl && this.whatsappConfig.apiKey) {
+      logger.info('📱 WhatsApp integration enabled');
+    } else {
+      logger.warn('📱 WhatsApp integration not configured - messages will be logged only');
     }
     
     this.db = null;
@@ -103,61 +117,63 @@ class NotificationService {
 
         await this.db.collection(COLLECTIONS.NOTIFICATIONS).doc(notificationId).set(firestoreData);
 
+        let emailSent = false;
+        let whatsappSent = false;
+        let emailResult = null;
+        let whatsappResult = null;
+        let hasErrors = false;
+        let errorMessages = [];
+
         // Send email if email channel is included
         if (channels.includes('email') && receiver.email) {
           try {
-            const emailResult = await this._sendEmail(receiver, content, type, metadata);
-            firestoreData.emailSent = true;
-            firestoreData.emailResult = emailResult;
-            firestoreData.status = 'sent';
-            
-            // Update Firestore with email status
-            await this.db.collection(COLLECTIONS.NOTIFICATIONS).doc(notificationId).update({
-              emailSent: true,
-              emailResult: emailResult,
-              status: 'sent',
-              updatedAt: timestamp
-            });
-
-            results.push({ 
-              success: true, 
-              notificationId, 
-              receiver: receiver.id, 
-              emailSent: true, 
-              emailResult 
-            });
+            emailResult = await this._sendEmail(receiver, content, type, metadata);
+            emailSent = true;
+            logger.info(`✅ Email sent for notification ${notificationId}`);
           } catch (emailError) {
             logger.error('❌ Email sending failed:', emailError);
-            
-            // Update Firestore with failure status
-            await this.db.collection(COLLECTIONS.NOTIFICATIONS).doc(notificationId).update({
-              status: 'failed',
-              error: emailError.message,
-              updatedAt: timestamp
-            });
-
-            results.push({ 
-              success: false, 
-              notificationId, 
-              receiver: receiver.id, 
-              emailSent: false, 
-              error: emailError.message 
-            });
+            hasErrors = true;
+            errorMessages.push(`Email: ${emailError.message}`);
           }
-        } else {
-          // Mark as sent for in-app only notifications
-          await this.db.collection(COLLECTIONS.NOTIFICATIONS).doc(notificationId).update({
-            status: 'sent',
-            updatedAt: timestamp
-          });
-
-          results.push({ 
-            success: true, 
-            notificationId, 
-            receiver: receiver.id, 
-            emailSent: false 
-          });
         }
+
+        // Send WhatsApp if whatsapp channel is included
+        if (channels.includes('whatsapp') && receiver.phone) {
+          try {
+            whatsappResult = await this._sendWhatsApp(receiver, content, type, metadata);
+            whatsappSent = true;
+            logger.info(`✅ WhatsApp sent for notification ${notificationId}`);
+          } catch (whatsappError) {
+            logger.error('❌ WhatsApp sending failed:', whatsappError);
+            hasErrors = true;
+            errorMessages.push(`WhatsApp: ${whatsappError.message}`);
+          }
+        }
+
+        // Update Firestore with results
+        const updateData = {
+          emailSent,
+          whatsappSent,
+          status: hasErrors && !emailSent && !whatsappSent ? 'failed' : 'sent',
+          updatedAt: timestamp
+        };
+
+        if (emailResult) updateData.emailResult = emailResult;
+        if (whatsappResult) updateData.whatsappResult = whatsappResult;
+        if (errorMessages.length > 0) updateData.error = errorMessages.join('; ');
+
+        await this.db.collection(COLLECTIONS.NOTIFICATIONS).doc(notificationId).update(updateData);
+
+        results.push({ 
+          success: !hasErrors || emailSent || whatsappSent,
+          notificationId, 
+          receiver: receiver.id, 
+          emailSent, 
+          whatsappSent,
+          emailResult,
+          whatsappResult,
+          errors: errorMessages.length > 0 ? errorMessages : undefined
+        });
       }
 
       logger.info(`✅ Notification processed for ${receivers.length} receivers`);
@@ -262,6 +278,65 @@ class NotificationService {
       }
       
       logger.error(`❌ Failed to send email to ${receiver.email} via Gmail:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send WhatsApp message
+   * @param {Object} receiver - Receiver data
+   * @param {Object} content - Message content
+   * @param {string} type - Notification type
+   * @param {Object} metadata - Additional metadata
+   */
+  async _sendWhatsApp(receiver, content, type, metadata = {}) {
+    try {
+      if (!this.whatsappConfig.enabled || !this.whatsappConfig.apiUrl) {
+        // Log message instead of sending if not configured
+        logger.warn(`📱 WhatsApp would be sent to ${receiver.phone} (WhatsApp not configured):`);
+        logger.warn(`Message: ${content.message?.substring(0, 200)}...`);
+        
+        return {
+          id: 'dev-' + Date.now(),
+          status: 'sent',
+          timestamp: new Date().toISOString(),
+          method: 'DEV_LOG'
+        };
+      }
+
+      // Prepare WhatsApp message data
+      const whatsappMessage = {
+        to: receiver.phone,
+        message: content.message,
+        type: 'text'
+      };
+
+      // Add action URL as a separate message if available
+      if (content.actionUrl) {
+        whatsappMessage.actionText = `View Details: ${content.actionUrl}`;
+      }
+
+      // Send via WhatsApp API
+      const response = await axios.post(this.whatsappConfig.apiUrl, whatsappMessage, {
+        headers: {
+          'Authorization': `Bearer ${this.whatsappConfig.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000 // 10 second timeout
+      });
+
+      logger.info(`✅ WhatsApp sent to ${receiver.phone}:`, response.data.id);
+      
+      return {
+        id: response.data.id || response.data.messageId,
+        status: 'sent',
+        timestamp: new Date().toISOString(),
+        method: 'WHATSAPP_API',
+        response: response.data
+      };
+
+    } catch (error) {
+      logger.error(`❌ Failed to send WhatsApp to ${receiver.phone}:`, error.message);
       throw error;
     }
   }
@@ -599,6 +674,10 @@ class NotificationService {
       
       if (data.channels.includes('email') && !receiver.email) {
         throw new Error('Email channel requires email address for all receivers');
+      }
+
+      if (data.channels.includes('whatsapp') && !receiver.phone) {
+        throw new Error('WhatsApp channel requires phone number for all receivers');
       }
     }
   }
