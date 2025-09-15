@@ -11,12 +11,17 @@ class FirebaseConfig {
   async initialize() {
     try {
       if (!admin.apps.length) {
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-        ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-        : require('../../config/firebase-service-account.json');
-
+        let serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+          ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+          : require('../../config/firebase-service-account.json');
+      
+        // 🔑 Fix private_key newlines
+        if (serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+      
         console.log("✅ Service account loaded, project_id:", serviceAccount.project_id);
-
+      
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
           databaseURL:
@@ -27,9 +32,10 @@ class FirebaseConfig {
             `${serviceAccount.project_id}.appspot.com`,
           projectId: serviceAccount.project_id,
         });
-
+      
         console.log("🔥 Firebase Admin SDK initialized with JSON file");
       }
+      
 
       this.db = admin.firestore();
       this.auth = admin.auth();
