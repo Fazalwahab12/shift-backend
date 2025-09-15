@@ -123,12 +123,12 @@ class ShiftServer {
       this.app.use(securityHeaders);
     }
     
-    // CORS - Railway specific
+    // CORS - Simplified for debugging
     const railwayCorsOptions = {
-      ...corsOptions,
-      origin: process.env.ALLOWED_ORIGINS ? 
-        process.env.ALLOWED_ORIGINS.split(',') : 
-        ['http://localhost:3000', 'https://localhost:3000','http://192.168.42.51:3000']
+      origin: true, // Allow all origins for debugging
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization']
     };
     this.app.use(cors(railwayCorsOptions));
     
