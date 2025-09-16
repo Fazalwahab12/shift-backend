@@ -48,6 +48,13 @@ router.get('/jobs/:jobId/applications', JobApplicationController.getJobApplicati
 router.get('/applications', JobApplicationController.getSeekerApplications);
 
 /**
+ * @route   GET /api/applications/rateable-seekers
+ * @desc    Get seekers who accepted hire/interview requests (for company rating)
+ * @access  Private (Company)
+ */
+router.get('/applications/rateable-seekers', JobApplicationController.getRateableSeekers);
+
+/**
  * @route   GET /api/applications/:applicationId
  * @desc    Get application details by ID
  * @access  Private
@@ -284,6 +291,7 @@ router.put('/applications/:applicationId/complete', [
     .isLength({ max: 300 })
     .withMessage('Notes must be a string with max 300 characters')
 ], JobApplicationController.completeJob);
+
 
 /**
  * @route   PUT /api/applications/:applicationId/cancel

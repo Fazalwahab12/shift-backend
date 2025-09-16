@@ -1679,6 +1679,90 @@ class JobApplicationController {
   }
 
   /**
+   * Get rateable seekers (who accepted hire/interview requests)
+   * GET /api/applications/rateable-seekers
+   */
+  static async getRateableSeekers(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      if (userType !== 'company') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Company users only.'
+        });
+      }
+
+      // Get the company profile ID for this user (not the user ID)
+      const CompanyProfile = require('../models/Company');
+      const companyProfile = await CompanyProfile.findByUserId(userId);
+
+      if (!companyProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company profile not found for this user'
+        });
+      }
+
+      const companyId = companyProfile.id;
+
+      // Use company profile ID to find applications
+      let filters = [
+        { field: 'companyId', operator: '==', value: companyId }
+      ];
+
+      const applications = await databaseService.query(
+        COLLECTIONS.JOB_APPLICATIONS,
+        filters,
+        { field: 'updatedAt', direction: 'desc' },
+        50 // Get recent applications
+      );
+
+      let applicationsData = applications.data || applications;
+
+      // Filter for seekers with status "hired" or "interviewed" who accepted
+      const rateableApplications = applicationsData.filter(app =>
+        (app.status === 'hired' || app.status === 'interviewed') &&
+        (app.hireResponse === 'accepted' || app.interviewResponse === 'accepted')
+      );
+
+      // Get seekers data
+      const seekers = [];
+      for (const appData of rateableApplications.slice(0, 10)) {
+        const application = new JobApplication(appData);
+        await application.populateData();
+
+        if (application.seekerData) {
+          seekers.push({
+            applicationId: application.id,
+            seekerId: application.seekerId,
+            ...application.seekerData,
+            jobTitle: application.jobData?.roleName,
+            acceptedType: appData.hireResponse === 'accepted' ? 'hire' : 'interview'
+          });
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Rateable seekers retrieved successfully',
+        data: {
+          seekers: seekers,
+          total: seekers.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting rateable seekers:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
    * Complete job (mark as completed)
    * PUT /api/applications/:applicationId/complete
    */
