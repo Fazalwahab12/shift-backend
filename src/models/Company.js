@@ -1836,6 +1836,26 @@ class Company {
   }
 
   /**
+   * Get all companies (for brand recommendations)
+   */
+  static async getAll(limit = 100) {
+    try {
+      // Get all companies without filters for brand recommendations
+      const companies = await databaseService.query(
+        COLLECTIONS.COMPANIES,
+        [], // No filters - get all companies
+        { field: 'updatedAt', direction: 'desc' },
+        limit
+      );
+
+      return companies.map(companyData => new Company(companyData));
+    } catch (error) {
+      console.error('Error getting all companies:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get companies by industry
    */
   static async getByIndustry(industry, limit = 20) {

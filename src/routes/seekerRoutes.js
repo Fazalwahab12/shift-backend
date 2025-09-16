@@ -225,6 +225,13 @@ router.get('/:seekerId/is-saved', authenticateToken, [
 ], SeekerController.checkSeekerSaved);
 
 /**
+ * @route   GET /api/seekers/brand-recommendations
+ * @desc    Get company brands matched to seeker's profile
+ * @access  Private (Seeker)
+ */
+router.get('/brand-recommendations', authenticateToken, SeekerController.getBrandRecommendations);
+
+/**
  * @route   GET /api/seekers/:seekerId
  * @desc    Get seeker profile by ID
  * @access  Private (JWT Token Required)
@@ -869,5 +876,34 @@ router.get('/recommendations', [
     .isInt({ min: 0 })
     .withMessage('Offset must be 0 or greater')
 ], SeekerController.getSeekerRecommendations);
+
+
+/**
+ * @route   GET /api/seekers/matched-brands
+ * @desc    Get company brands matched to seeker's profile
+ * @access  Private (Seeker)
+ */
+router.get('/matched-brands', SeekerController.getMatchedBrands);
+
+/**
+ * @route   GET /api/seekers/followed-brands
+ * @desc    Get brands followed by seeker
+ * @access  Private (Seeker)
+ */
+router.get('/followed-brands', SeekerController.getFollowedBrands);
+
+/**
+ * @route   POST /api/seekers/brands/:brandId/follow
+ * @desc    Follow a brand
+ * @access  Private (Seeker)
+ */
+router.post('/brands/:brandId/follow', SeekerController.followBrand);
+
+/**
+ * @route   DELETE /api/seekers/brands/:brandId/follow
+ * @desc    Unfollow a brand
+ * @access  Private (Seeker)
+ */
+router.delete('/brands/:brandId/follow', SeekerController.unfollowBrand);
 
 module.exports = router;

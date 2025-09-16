@@ -1876,6 +1876,368 @@ class SeekerController {
       });
     }
   }
+
+  /**
+   * Get brand recommendations for seeker (same pattern as seeker recommendations)
+   * GET /api/seekers/brand-recommendations
+   */
+  static async getBrandRecommendations(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Seeker users only.'
+        });
+      }
+
+      // Get seeker profile to extract roles, industries, skills
+      console.log('🔍 Looking for seeker with userId:', userId);
+      const seeker = await Seeker.findByUserId(userId);
+      console.log('🔍 Seeker found:', seeker ? { id: seeker.id, fullName: seeker.fullName, roles: seeker.roles } : 'Not found');
+
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Use seeker's profile data (same as recommendation pattern)
+      const roles = seeker.roles || [];
+      const industries = seeker.industries || [];
+      const skills = seeker.skills || [];
+
+      console.log('🔍 Seeker profile:', { roles, industries, skills });
+
+      // Get all companies and match their brands
+      const CompanyProfile = require('../models/Company');
+      const companies = await CompanyProfile.getAll();
+
+      const matchedBrands = [];
+
+      for (const company of companies) {
+        if (company.brands && company.brands.length > 0) {
+          for (const brand of company.brands) {
+            // Get brand data
+            const brandRoles = brand.roles || [];
+            const brandIndustries = brand.industries || [brand.industry].filter(Boolean);
+            const brandSkills = brand.skills || [];
+
+            // Check for ANY match (role OR industry OR skill)
+            const roleMatch = brandRoles.some(role => roles.includes(role));
+            const industryMatch = brandIndustries.some(industry => industries.includes(industry));
+            const skillMatch = brandSkills.some(skill => skills.includes(skill));
+
+            // If ANY match found, include this brand
+            if (roleMatch || industryMatch || skillMatch) {
+              matchedBrands.push({
+                brandId: brand.id || `${company.id}-brand-${matchedBrands.length}`,
+                brandName: brand.name,
+                companyId: company.id,
+                companyName: company.companyName,
+                industry: brand.industry,
+                roles: brandRoles,
+                skills: brandSkills,
+                matchScore: (roleMatch ? 1 : 0) + (industryMatch ? 1 : 0) + (skillMatch ? 1 : 0),
+                activityScore: 100,
+                jobCount: 0,
+                locationCount: 1,
+                recentJobsCount: 0,
+                locations: [],
+                isFollowed: false
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by match score (highest first)
+      matchedBrands.sort((a, b) => b.matchScore - a.matchScore);
+
+      console.log('🔍 Found matched brands:', matchedBrands.length);
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand recommendations retrieved successfully',
+        data: {
+          brands: matchedBrands,
+          total: matchedBrands.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting brand recommendations:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get company brands matched to seeker's profile
+   * GET /api/seekers/matched-brands
+   */
+  static async getMatchedBrands(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Seeker users only.'
+        });
+      }
+
+      // Get seeker profile
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      const seekerRoles = seeker.roles || [];
+      const seekerIndustries = seeker.industries || [];
+      const seekerSkills = seeker.skills || [];
+
+      // Get all companies with brands
+      const CompanyProfile = require('../models/Company');
+      const companies = await CompanyProfile.getAll();
+
+      const matchedBrands = [];
+
+      for (const company of companies) {
+        if (company.brands && company.brands.length > 0) {
+          for (const brand of company.brands) {
+            const brandRoles = brand.roles || [];
+            const brandIndustries = brand.industries || [brand.industry].filter(Boolean);
+            const brandSkills = brand.skills || [];
+
+            // Check for matches
+            const roleMatch = brandRoles.some(role => seekerRoles.includes(role));
+            const industryMatch = brandIndustries.some(industry => seekerIndustries.includes(industry));
+            const skillMatch = brandSkills.some(skill => seekerSkills.includes(skill));
+
+            // If ANY match found, include this brand
+            if (roleMatch || industryMatch || skillMatch) {
+              matchedBrands.push({
+                brandId: brand.id || brand.brandId,
+                brandName: brand.name,
+                companyId: company.id,
+                companyName: company.companyName,
+                industry: brand.industry,
+                roles: brandRoles,
+                skills: brandSkills,
+                matchScore: (roleMatch ? 1 : 0) + (industryMatch ? 1 : 0) + (skillMatch ? 1 : 0),
+                logo: brand.logo
+              });
+            }
+          }
+        }
+      }
+
+      // Sort by match score (highest first)
+      matchedBrands.sort((a, b) => b.matchScore - a.matchScore);
+
+      res.status(200).json({
+        success: true,
+        message: 'Matched brands retrieved successfully',
+        data: {
+          brands: matchedBrands,
+          total: matchedBrands.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting matched brands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get brands followed by seeker
+   * GET /api/seekers/followed-brands
+   */
+  static async getFollowedBrands(req, res) {
+    try {
+      const { userId, userType } = req.user;
+
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Seeker users only.'
+        });
+      }
+
+      // Get seeker profile with followed brands
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      const followedBrandIds = seeker.followedBrands || [];
+      const followedBrands = [];
+
+      // Get details for each followed brand
+      const CompanyProfile = require('../models/Company');
+      const companies = await CompanyProfile.getAll();
+
+      for (const company of companies) {
+        if (company.brands && company.brands.length > 0) {
+          for (const brand of company.brands) {
+            const brandId = brand.id || brand.brandId;
+            if (followedBrandIds.includes(brandId)) {
+              followedBrands.push({
+                brandId: brandId,
+                brandName: brand.name,
+                companyId: company.id,
+                companyName: company.companyName,
+                industry: brand.industry,
+                logo: brand.logo
+              });
+            }
+          }
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Followed brands retrieved successfully',
+        data: {
+          brands: followedBrands,
+          total: followedBrands.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting followed brands:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Follow a brand
+   * POST /api/seekers/brands/:brandId/follow
+   */
+  static async followBrand(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { brandId } = req.params;
+
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Seeker users only.'
+        });
+      }
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Add brand to followed list
+      const followedBrands = seeker.followedBrands || [];
+      if (!followedBrands.includes(brandId)) {
+        followedBrands.push(brandId);
+
+        // Update seeker profile
+        await databaseService.update(
+          COLLECTIONS.SEEKERS,
+          seeker.id,
+          {
+            followedBrands: followedBrands,
+            updatedAt: new Date().toISOString()
+          }
+        );
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand followed successfully'
+      });
+
+    } catch (error) {
+      console.error('Error following brand:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Unfollow a brand
+   * DELETE /api/seekers/brands/:brandId/follow
+   */
+  static async unfollowBrand(req, res) {
+    try {
+      const { userId, userType } = req.user;
+      const { brandId } = req.params;
+
+      if (userType !== 'seeker') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Seeker users only.'
+        });
+      }
+
+      const seeker = await Seeker.findByUserId(userId);
+      if (!seeker) {
+        return res.status(404).json({
+          success: false,
+          message: 'Seeker profile not found'
+        });
+      }
+
+      // Remove brand from followed list
+      const followedBrands = seeker.followedBrands || [];
+      const updatedFollowedBrands = followedBrands.filter(id => id !== brandId);
+
+      // Update seeker profile
+      await databaseService.update(
+        COLLECTIONS.SEEKERS,
+        seeker.id,
+        {
+          followedBrands: updatedFollowedBrands,
+          updatedAt: new Date().toISOString()
+        }
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Brand unfollowed successfully'
+      });
+
+    } catch (error) {
+      console.error('Error unfollowing brand:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = SeekerController;
