@@ -52,6 +52,25 @@ class JobController {
       // Immediately populate company and location data
       await job.populateCompanyData();
 
+      // Increment brand-specific job count if brandLocationId is provided
+      if (req.body.brandLocationId && req.body.brandLocationId !== 'custom') {
+        try {
+          await company.incrementBrandJobCount(req.body.brandLocationId, true);
+          console.log(`✅ Incremented job count for brand location: ${req.body.brandLocationId}`);
+        } catch (error) {
+          console.error('❌ Failed to increment brand job count:', error);
+          // Don't fail the job creation for this
+        }
+      } else {
+        // Fallback to company-level increment if no specific brand
+        try {
+          await company.incrementJobCount();
+          console.log('✅ Incremented company-level job count');
+        } catch (error) {
+          console.error('❌ Failed to increment company job count:', error);
+        }
+      }
+
       res.status(201).json({
         success: true,
         message: 'Job created successfully',
@@ -521,6 +540,24 @@ class JobController {
 
       const copiedJob = await Job.create(originalJob.companyId, jobData);
 
+      // Increment brand-specific job count for copied job
+      const company = await Company.findById(originalJob.companyId);
+      if (company && jobData.brandLocationId && jobData.brandLocationId !== 'custom') {
+        try {
+          await company.incrementBrandJobCount(jobData.brandLocationId, true);
+          console.log(`✅ Incremented job count for copied job brand location: ${jobData.brandLocationId}`);
+        } catch (error) {
+          console.error('❌ Failed to increment brand job count for copied job:', error);
+        }
+      } else if (company) {
+        try {
+          await company.incrementJobCount();
+          console.log('✅ Incremented company-level job count for copied job');
+        } catch (error) {
+          console.error('❌ Failed to increment company job count for copied job:', error);
+        }
+      }
+
       res.status(201).json({
         success: true,
         message: 'Job copied successfully',
@@ -567,6 +604,30 @@ class JobController {
         applicationStatus: 'Canceled',
         canceledDate: new Date().toISOString()
       });
+
+      // Decrement active job count for the brand
+      if (job.brandLocationId && job.brandLocationId !== 'custom') {
+        try {
+          const company = await Company.findById(job.companyId);
+          if (company) {
+            await company.decrementBrandActiveJobCount(job.brandLocationId);
+            console.log(`✅ Decremented active job count for brand location: ${job.brandLocationId}`);
+          }
+        } catch (error) {
+          console.error('❌ Failed to decrement brand active job count:', error);
+        }
+      } else {
+        // Fallback to company-level decrement
+        try {
+          const company = await Company.findById(job.companyId);
+          if (company) {
+            await company.update({ activeJobs: Math.max(0, company.activeJobs - 1) });
+            console.log('✅ Decremented company-level active job count');
+          }
+        } catch (error) {
+          console.error('❌ Failed to decrement company active job count:', error);
+        }
+      }
 
       res.status(200).json({
         success: true,

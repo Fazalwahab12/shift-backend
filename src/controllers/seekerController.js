@@ -1311,7 +1311,7 @@ class SeekerController {
           console.error('❌ Default bucket failed, trying with explicit name:', bucketError.message);
           try {
             // Try with explicit bucket name from config
-            const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'shipt-ed0e2';
+            const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'shift-66a92';
             bucket = global.firebase.storage().bucket(bucketName);
             console.log(`✅ Successfully accessed Firebase Storage bucket: ${bucketName}`);
           } catch (explicitBucketError) {
@@ -1942,10 +1942,11 @@ class SeekerController {
                 skills: brandSkills,
                 matchScore: (roleMatch ? 1 : 0) + (industryMatch ? 1 : 0) + (skillMatch ? 1 : 0),
                 activityScore: 100,
-                jobCount: 0,
-                locationCount: 1,
-                recentJobsCount: 0,
-                locations: [],
+                totalJobs: brand.totalJobs || 0,  // Use actual totalJobs from Company model
+                activeJobs: brand.activeJobs || 0, // Use actual activeJobs from Company model
+                locationCount: company.locations ? company.locations.length : 1,
+                recentJobsCount: brand.activeJobs || 0,
+                locations: company.locations || [],
                 isFollowed: false
               });
             }

@@ -13,24 +13,11 @@ const logger = require('../utils/logger');
 
 class NotificationService {
   constructor() {
-    // Validate Gmail credentials
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASSWORD) {
-      logger.warn('⚠️  GMAIL_USER or GMAIL_PASSWORD environment variables not set. Email functionality will be disabled.');
-    }
+    // Setup professional email transporter
+    this.transporter = this._setupEmailTransporter();
     
-    // Setup Gmail transporter with Nodemailer
-    if (process.env.GMAIL_USER && process.env.GMAIL_PASSWORD) {
-      this.transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: process.env.GMAIL_USER,
-          pass: process.env.GMAIL_PASSWORD,
-        },
-      });
-      logger.info('📧 Using Gmail with Nodemailer for email sending');
-    } else {
-      this.transporter = null;
-      logger.warn('📧 Email transporter not configured - emails will be logged only');
+    if (!this.transporter) {
+      logger.error('❌ Email transporter not configured. Set SMTP_* environment variables.');
     }
 
     // Setup WhatsApp integration
@@ -48,6 +35,40 @@ class NotificationService {
     
     this.db = null;
     this.initialized = false;
+  }
+
+  /**
+   * Setup professional SMTP email transporter
+   * Production-ready configuration for hireshift.com email
+   */
+  _setupEmailTransporter() {
+    // Validate required SMTP environment variables
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      logger.error('❌ Missing required SMTP configuration. Set SMTP_HOST, SMTP_USER, and SMTP_PASSWORD.');
+      return null;
+    }
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASSWORD,
+        },
+        tls: {
+          rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false'
+        }
+      });
+      
+      logger.info(`📧 Professional SMTP configured: ${process.env.SMTP_HOST} (${process.env.SMTP_USER})`);
+      return transporter;
+      
+    } catch (error) {
+      logger.error('❌ SMTP configuration failed:', error.message);
+      return null;
+    }
   }
 
   /**
@@ -198,8 +219,12 @@ class NotificationService {
     try {
       const emailTemplate = this._getEmailTemplate(type, content, metadata);
       
+      // Professional email sender configuration
+      const senderEmail = process.env.SMTP_USER;
+      const senderName = process.env.EMAIL_SENDER_NAME || 'Shift';
+      
       const emailData = {
-        from: `"Shift" <${process.env.GMAIL_USER}>`, // Use Gmail user as sender
+        from: `"${senderName}" <${senderEmail}>`,
         to: receiver.email,
         subject: emailTemplate.subject,
         html: emailTemplate.html,

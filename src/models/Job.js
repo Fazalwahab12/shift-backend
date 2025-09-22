@@ -372,10 +372,100 @@ class Job {
       });
 
       const result = await databaseService.create(COLLECTIONS.JOBS, job.toJSON());
-      return new Job({ id: result.id, ...result });
+      const newJob = new Job({ id: result.id, ...result });
+
+      // Update company job totals
+      await Job.updateCompanyJobTotals(companyId);
+
+      // Update brand job totals if brandLocationId is provided
+      if (jobData.brandLocationId) {
+        await Job.updateBrandJobTotals(companyId, jobData.brandLocationId);
+      }
+
+      return newJob;
     } catch (error) {
       console.error('Error creating job:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Update company job totals (totalJobsPosted and activeJobs)
+   */
+  static async updateCompanyJobTotals(companyId) {
+    try {
+      const Company = require('./Company');
+
+      // Get all jobs for this company
+      const allJobs = await Job.findByCompanyId(companyId);
+      const activeJobs = allJobs.filter(job => job.isActive);
+
+      // Update company totals
+      const company = await Company.findById(companyId);
+      if (company) {
+        await company.update({
+          totalJobsPosted: allJobs.length,
+          activeJobs: activeJobs.length
+        });
+      }
+    } catch (error) {
+      console.error('Error updating company job totals:', error);
+    }
+  }
+
+  /**
+   * Update brand job totals for a specific brand location
+   */
+  static async updateBrandJobTotals(companyId, brandLocationId) {
+    try {
+      const Company = require('./Company');
+
+      // Get company and find the location
+      const company = await Company.findById(companyId);
+      if (!company || !company.locations) return;
+
+      const location = company.locations.find(loc => loc.id === brandLocationId);
+      if (!location || !location.brand) return;
+
+      // Find the brand and count its jobs
+      const brandName = location.brand;
+      const brandJobs = await Job.findByBrand(companyId, brandName);
+      const activeBrandJobs = brandJobs.filter(job => job.isActive);
+
+      // Update brand in company.brands array
+      if (company.brands) {
+        const updatedBrands = company.brands.map(brand => {
+          if (brand.name === brandName) {
+            return {
+              ...brand,
+              totalJobs: brandJobs.length,
+              activeJobs: activeBrandJobs.length
+            };
+          }
+          return brand;
+        });
+
+        await company.update({ brands: updatedBrands });
+      }
+    } catch (error) {
+      console.error('Error updating brand job totals:', error);
+    }
+  }
+
+  /**
+   * Find jobs by brand name
+   */
+  static async findByBrand(companyId, brandName) {
+    try {
+      const allJobs = await Job.findByCompanyId(companyId);
+      return allJobs.filter(job => {
+        // Match by brand through location lookup
+        return job.brandName === brandName ||
+               (job.brandLocationId && job.locationData?.brand === brandName);
+      });
+    } catch (error) {
+      console.error('Error finding jobs by brand:', error);
+      return [];
     }
   }
 

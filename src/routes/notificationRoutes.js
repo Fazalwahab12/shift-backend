@@ -533,9 +533,10 @@ router.get('/health', (req, res) => {
       seekerCreated: 'POST /api/notifications/seeker-created',
       applicationSubmitted: 'POST /api/notifications/application-submitted',
       interviewRequest: 'POST /api/notifications/interview-request',
-      paymentSuccessful: 'POST /api/notifications/payment-successful'
+      paymentSuccessful: 'POST /api/notifications/payment-successful',
     }
   });
 });
+
 
 module.exports = router;

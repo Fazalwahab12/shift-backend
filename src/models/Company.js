@@ -9,127 +9,47 @@ class Company {
   constructor(data = {}) {
     this.id = data.id || null;
     this.userId = data.userId || null;
-    
+
     this.companyName = data.companyName || null;
     this.crNumber = data.crNumber || null;
     this.companyType = data.companyType || null;
     this.geographicalPresence = data.geographicalPresence || null;
-    
+
     this.adminDetails = data.adminDetails || {
-      fullName: data.contactPerson || null, 
-      role: data.contactRole || null,
-      phone: data.contactPhone || null, 
-      email: data.contactEmail || null, 
-      position: data.contactRole || null,
-      
+      fullName: data.contactPerson || data.adminName || null,
+      role: data.contactRole || data.adminRole || null,
+      phone: data.contactPhone || data.adminPhone || null,
+      email: data.contactEmail || data.adminEmail || null,
+      position: data.contactRole || data.adminRole || null,
     };
-    
-    this.companyNumber = data.companyNumber || null; 
-    this.industry = data.industry || null; 
-    this.roles = data.roles || []; 
-    this.registrationDate = data.registrationDate || new Date().toISOString(); 
-    this.numberOfBands = data.numberOfBands || 1; 
-    this.numberOfBranches = data.numberOfBranches || 1;
+
+    this.companyNumber = data.companyNumber || null;
+    this.industry = data.industry || null;
+    this.registrationDate = data.registrationDate || new Date().toISOString();
+    this.numberOfBands = data.numberOfBands || null;
+    this.numberOfBranches = data.numberOfBranches || null;
     this.lastActiveDate = data.lastActiveDate || null;
-    this.numberOfJobPosts = data.numberOfJobPosts || 0; 
-    this.totalInstantHires = data.totalInstantHires || 0;
+
+    // Consolidate hiring metrics - use single source of truth
+    this.totalJobsPosted = data.totalJobsPosted || data.numberOfJobPosts || 0;
+    this.totalHires = data.totalHires || data.totalInstantHires || data.successfulMatches || 0;
     this.totalInterviews = data.totalInterviews || 0;
-    this.spentOnHiring = data.spentOnHiring || 0; 
-    this.usedFreeTrial = data.usedFreeTrial || false; 
+    this.totalSpentOnHiring = data.totalSpentOnHiring || data.spentOnHiring || 0;
+    this.hasUsedFreeTrial = data.hasUsedFreeTrial || data.usedFreeTrial || false;
     this.previousPlansPurchases = data.previousPlansPurchases || [];
     
-    this.companyAnalytics = data.companyAnalytics || {
-     
-      totalJobPosts: this.numberOfJobPosts || 0,
-      totalInstantHires: this.totalInstantHires || 0,
-      totalInterviews: this.totalInterviews || 0,
-      totalSpentOnHiring: this.spentOnHiring || 0, // OMR
-      hasUsedFreeTrial: this.usedFreeTrial || false,
-      previousPlanPurchases: this.previousPlansPurchases || [],
-      lastActiveDate: this.lastActiveDate || null,
-      registrationDate: this.registrationDate || new Date().toISOString(),
-      
-      // Enhanced performance metrics
-      performanceMetrics: {
-        hireSuccessRate: 0,
-        averageTimeToHire: 0,
-        interviewToHireRatio: 0,
-        candidateQualityScore: 0,
-        costPerHire: 0,
-        timeToFill: 0,
-        retentionRate: 0
-      },
-      
-      // Business structure metrics
-      businessStructure: {
-        numberOfBands: this.numberOfBands || 1,
-        numberOfBranches: this.numberOfBranches || 1,
-        totalBusinessEntities: this.numberOfBands || 1,
-        operationalScale: 'local'
-      },
-      
-      // Hiring efficiency metrics
-      hiringEfficiency: {
-        jobsPostedThisMonth: 0,
-        interviewsConductedThisMonth: 0,
-        hiresThisMonth: 0,
-        averageResponseTime: 0,
-        candidateSatisfactionScore: 0
-      }
-    };
     
-    // Industry Classification 
-    this.industryDetails = data.industryDetails || {
-      primaryIndustry: this.industry || null, 
-      secondaryIndustries: [],
-      industrySize: null,
-      businessType: null,
-      specializations: [],
-      certifications: [],
-      roles: this.roles || [], 
-      industryCategory: null,
-      subIndustry: null
-    };
-    
-    // Company Structure & Scale 
-    this.organizationStructure = data.organizationStructure || {
-      numberOfBands: this.numberOfBands || 1, 
-      numberOfBranches: this.numberOfBranches || 1, 
-      totalEmployees: null,
-      departmentCount: 0,
-      hierarchyLevels: 1,
-      operationalScale: 'local',
-      businessEntities: this.numberOfBands || 1,
-      totalLocations: this.numberOfBranches || 1
-    };
+
     
     // STEP 2: Business Entity / Brand Details
     this.brands = data.brands || [];
     this.primaryBrand = data.primaryBrand || null;
     
-    // Enhanced Brand Portfolio Management
-    this.brandPortfolio = data.brandPortfolio || {
-      totalBrands: 0,
-      activeBrands: 0,
-      brandCategories: [],
-      brandPerformance: {},
-      marketPresence: {
-        localMarkets: [],
-        regionalMarkets: [],
-        internationalMarkets: []
-      },
-      brandAssets: {
-        logos: {},
-        trademarks: [],
-        copyrights: [],
-        patents: []
-      }
-    };
     
     // STEP 3: Business Location & Team
     this.locations = data.locations || [];
     this.teamMembers = data.teamMembers || [];
-    this.maxLocations = data.maxLocations || 1;
+    this.maxLocations = data.maxLocations || null;
     
     // STEP 4: ENHANCED SUBSCRIPTION & PAYMENT SYSTEM 
     this.subscriptionPlan = data.subscriptionPlan || 'trial';
@@ -260,8 +180,8 @@ class Company {
       }
     };
     
-    // 14-DAY TRIAL SYSTEM
-    this.trialStartAt = data.trialStartAt || data.trialStartDate || new Date().toISOString();
+    // 14-DAY TRIAL SYSTEM - consolidate trial date fields
+    this.trialStartDate = data.trialStartDate || data.trialStartAt || new Date().toISOString();
     this.trialEndDate = data.trialEndDate || this.calculateTrialEndDate();
     this.trialExpired = data.trialExpired || false;
     
@@ -290,14 +210,6 @@ class Company {
       transactionReference: null // External reference
     };
     
-    // OMAN BANK API INTEGRATION
-    this.bankDetails = data.bankDetails || {
-      bankName: null,
-      accountNumber: null,
-      iban: null,
-      swiftCode: null,
-      isVerified: false
-    };
     this.withdrawalSettings = data.withdrawalSettings || {
       method: 'bank',
       minAmount: 50,
@@ -331,34 +243,6 @@ class Company {
     };
     this.planLimits = data.planLimits || this.getPlanLimits();
     
-    // Advanced Usage Analytics
-    this.analyticsData = data.analyticsData || {
-      hiringFunnel: {
-        jobPostings: 0,
-        applications: 0,
-        screenings: 0,
-        interviews: 0,
-        offers: 0,
-        hires: 0
-      },
-      timeToHire: {
-        average: 0,
-        median: 0,
-        fastest: null,
-        slowest: null
-      },
-      costAnalysis: {
-        averageCostPerHire: 0,
-        totalHiringCost: 0,
-        costPerChannel: {},
-        budgetUtilization: 0
-      },
-      candidateQuality: {
-        averageScore: 0,
-        retentionRate: 0,
-        performanceRating: 0
-      }
-    };
     
     // STEP 5: Terms & Conditions
     this.termsAccepted = data.termsAccepted || false;
@@ -383,50 +267,15 @@ class Company {
     // CUSTOM PLANS & ADMIN CONTACT
     this.customPlanRequested = data.customPlanRequested || false;
     this.customPlanDetails = data.customPlanDetails || null;
-    this.adminContactRequested = data.adminContactRequested || false;
-    this.adminNotes = data.adminNotes || null;
     
     // SYSTEM FIELDS
     this.isActive = data.isActive !== undefined ? data.isActive : true;
     this.lastLoginAt = data.lastLoginAt || null;
     
-    // PERFORMANCE METRICS
-    this.totalJobsPosted = data.totalJobsPosted || 0;
+    // PERFORMANCE METRICS - removed duplicates, use consolidated fields above
     this.activeJobs = data.activeJobs || 0;
-    this.totalHires = data.totalHires || 0;
-    this.successfulMatches = data.successfulMatches || 0;
-    this.averageRating = data.averageRating || 0;
     this.totalReviews = data.totalReviews || 0;
     
-    // Comprehensive Performance Dashboard
-    this.performanceDashboard = data.performanceDashboard || {
-      kpis: {
-        monthlyHires: 0,
-        quarterlyHires: 0,
-        yearlyHires: 0,
-        hiringVelocity: 0,
-        candidateQualityIndex: 0,
-        employerBrandScore: 0
-      },
-      trends: {
-        hiringTrend: 'stable',
-        seasonalPatterns: {},
-        industryComparison: {},
-        competitorAnalysis: {}
-      },
-      predictions: {
-        nextMonthHiring: 0,
-        budgetForecasting: 0,
-        trendPredictions: {},
-        recommendations: []
-      },
-      benchmarks: {
-        industryAverage: {},
-        topPerformers: {},
-        improvementAreas: [],
-        strengthAreas: []
-      }
-    };
     
     // HEALTH SCORE (Overall company performance rating)
     this.healthScore = data.healthScore || 0; // 0-100
@@ -458,16 +307,17 @@ class Company {
 
       this.paymentHistory.push(transaction);
       
-      // Update company analytics
-      this.companyAnalytics.totalSpentOnHiring += transaction.amount;
-      this.companyAnalytics.lastActiveDate = new Date().toISOString();
+      // Update spending total
+      this.totalSpentOnHiring += transaction.amount;
+      this.lastActiveDate = new Date().toISOString();
       
       // Update usage based on payment type
       await this.updateUsageFromPayment(transaction);
       
       await this.update({
         paymentHistory: this.paymentHistory,
-        companyAnalytics: this.companyAnalytics
+        totalSpentOnHiring: this.totalSpentOnHiring,
+        lastActiveDate: this.lastActiveDate
       });
 
       return transaction;
@@ -588,17 +438,16 @@ class Company {
       admin: this.adminDetails?.fullName,
       adminPhoneNumber: this.adminDetails?.phone,
       adminEmail: this.adminDetails?.email,
-      industry: this.industry || this.industryDetails?.primaryIndustry,
-      roles: Array.isArray(this.roles) ? this.roles.join(', ') : this.roles,
+      industry: this.industry,
       registrationDate: this.registrationDate,
-      numberOfBands: this.numberOfBands,
-      numberOfBranches: this.numberOfBranches,
-      lastActiveDate: this.lastActiveDate || this.companyAnalytics?.lastActiveDate,
-      numberOfJobPosts: this.numberOfJobPosts || this.totalJobsPosted,
-      totalInstantHires: this.totalInstantHires || this.successfulMatches,
-      totalInterviews: this.totalInterviews || this.companyAnalytics?.totalInterviews,
-      spentOnHiring: this.spentOnHiring || this.companyAnalytics?.totalSpentOnHiring,
-      usedFreeTrial: this.usedFreeTrial || this.companyAnalytics?.hasUsedFreeTrial,
+      numberOfBands: this.numberOfBands || 0,
+      numberOfBranches: this.numberOfBranches || 0,
+      lastActiveDate: this.lastActiveDate,
+      totalJobsPosted: this.totalJobsPosted,
+      totalHires: this.totalHires,
+      totalInterviews: this.totalInterviews,
+      totalSpentOnHiring: this.totalSpentOnHiring,
+      hasUsedFreeTrial: this.hasUsedFreeTrial,
       previousPlansPurchases: Array.isArray(this.previousPlansPurchases) ? this.previousPlansPurchases.join(', ') : this.previousPlansPurchases
     };
   }
@@ -614,14 +463,14 @@ class Company {
       industry: csvData.industry || csvData['Industry'],
       roles: csvData.roles || csvData['Roles'],
       registrationDate: csvData.registrationDate || csvData['Registration Date'],
-      numberOfBands: parseInt(csvData.numberOfBands || csvData['No. of Bands / Business Entities']) || 1,
-      numberOfBranches: parseInt(csvData.numberOfBranches || csvData['No. of Branches']) || 1,
+      numberOfBands: csvData.numberOfBands || csvData['No. of Bands / Business Entities'] ? parseInt(csvData.numberOfBands || csvData['No. of Bands / Business Entities']) : null,
+      numberOfBranches: csvData.numberOfBranches || csvData['No. of Branches'] ? parseInt(csvData.numberOfBranches || csvData['No. of Branches']) : null,
       lastActiveDate: csvData.lastActiveDate || csvData['Last Active Date'],
-      numberOfJobPosts: parseInt(csvData.numberOfJobPosts || csvData['Number of Job Posts']) || 0,
-      totalInstantHires: parseInt(csvData.totalInstantHires || csvData['Total Instant Hires']) || 0,
+      totalJobsPosted: parseInt(csvData.totalJobsPosted || csvData.numberOfJobPosts || csvData['Number of Job Posts']) || 0,
+      totalHires: parseInt(csvData.totalHires || csvData.totalInstantHires || csvData['Total Instant Hires']) || 0,
       totalInterviews: parseInt(csvData.totalInterviews || csvData['Total Interviews']) || 0,
-      spentOnHiring: parseFloat(csvData.spentOnHiring || csvData['Spent on Hiring']) || 0,
-      usedFreeTrial: csvData.usedFreeTrial === 'true' || csvData['Used Free Trial?'] === 'true',
+      totalSpentOnHiring: parseFloat(csvData.totalSpentOnHiring || csvData.spentOnHiring || csvData['Spent on Hiring']) || 0,
+      hasUsedFreeTrial: csvData.hasUsedFreeTrial === 'true' || csvData.usedFreeTrial === 'true' || csvData['Used Free Trial?'] === 'true',
       previousPlansPurchases: csvData.previousPlansPurchases || csvData['Previous Plans Purchases']
     };
 
@@ -655,9 +504,9 @@ class Company {
       adminEmail: this.adminDetails?.email,
       
       // Business structure
-      numberOfBands: this.numberOfBands,
-      numberOfBranches: this.numberOfBranches,
-      totalBusinessEntities: this.numberOfBands,
+      numberOfBands: this.numberOfBands || 0,
+      numberOfBranches: this.numberOfBranches || 0,
+      totalBusinessEntities: this.numberOfBands || 0,
       
       // Activity metrics
       registrationDate: this.registrationDate,
@@ -665,22 +514,22 @@ class Company {
       daysSinceRegistration: this.registrationDate ? Math.floor((new Date() - new Date(this.registrationDate)) / (1000 * 60 * 60 * 24)) : 0,
       daysSinceLastActive: this.lastActiveDate ? Math.floor((new Date() - new Date(this.lastActiveDate)) / (1000 * 60 * 60 * 24)) : 0,
       
-      // Hiring metrics
-      totalJobPosts: this.numberOfJobPosts,
-      totalInstantHires: this.totalInstantHires,
+      // Hiring metrics - use consolidated fields
+      totalJobPosts: this.totalJobsPosted,
+      totalInstantHires: this.totalHires,
       totalInterviews: this.totalInterviews,
-      spentOnHiring: this.spentOnHiring,
+      spentOnHiring: this.totalSpentOnHiring,
       
       // Subscription info
-      usedFreeTrial: this.usedFreeTrial,
+      usedFreeTrial: this.hasUsedFreeTrial,
       previousPlansPurchases: this.previousPlansPurchases,
       currentSubscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.getSubscriptionStatus(),
       
       // Performance metrics
-      hireSuccessRate: this.totalJobPosts > 0 ? (this.totalInstantHires / this.totalJobPosts) * 100 : 0,
-      averageCostPerHire: this.totalInstantHires > 0 ? this.spentOnHiring / this.totalInstantHires : 0,
-      interviewToHireRatio: this.totalInstantHires > 0 ? this.totalInterviews / this.totalInstantHires : 0
+      hireSuccessRate: this.totalJobsPosted > 0 ? (this.totalHires / this.totalJobsPosted) * 100 : 0,
+      averageCostPerHire: this.totalHires > 0 ? this.totalSpentOnHiring / this.totalHires : 0,
+      interviewToHireRatio: this.totalHires > 0 ? this.totalInterviews / this.totalHires : 0
     };
   }
 
@@ -730,7 +579,7 @@ class Company {
    * Calculate trial end date
    */
   calculateTrialEndDate() {
-    const trialStart = new Date(this.trialStartAt);
+    const trialStart = new Date(this.trialStartDate);
     const trialEnd = new Date(trialStart.getTime() + (14 * 24 * 60 * 60 * 1000)); // 14 days
     return trialEnd.toISOString();
   }
@@ -874,7 +723,7 @@ class Company {
       'adminDetails.fullName',
       'adminDetails.email',
       'adminDetails.phone',
-      'industryDetails.primaryIndustry'
+      'industry'
     ];
     
     let completedFields = 0;
@@ -902,16 +751,16 @@ class Company {
     try {
       const company = new Company({
         userId: userId,
-        trialStartAt: new Date().toISOString(),
+        trialStartDate: new Date().toISOString(),
         ...companyData
       });
 
       const result = await databaseService.create(COLLECTIONS.COMPANIES, company.toJSON());
       const createdCompany = new Company({ id: result.id, ...result });
-      
+
       // Calculate trial days remaining after creation
       await createdCompany.updateTrialStatus();
-      
+
       return createdCompany;
     } catch (error) {
       console.error('Error creating company profile:', error);
@@ -924,7 +773,7 @@ class Company {
    */
   calculateRemainingDays() {
     const now = new Date();
-    const trialStart = new Date(this.trialStartAt);
+    const trialStart = new Date(this.trialStartDate);
 
     // Set both dates to start of day for accurate day calculation
     const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -956,7 +805,7 @@ class Company {
   async updateTrialStatus() {
     try {
       const now = new Date();
-      const trialStart = new Date(this.trialStartAt);
+      const trialStart = new Date(this.trialStartDate);
       const trialEnd = new Date(this.trialEndDate);
 
       // Set both dates to start of day for accurate day calculation
@@ -965,7 +814,7 @@ class Company {
 
       const daysPassed = Math.floor((nowDay - startDay) / (1000 * 60 * 60 * 24));
       const daysRemaining = Math.max(0, 14 - daysPassed);
-      
+
       const updateData = {
         trialExpired: daysRemaining === 0,
         updatedAt: new Date().toISOString()
@@ -1373,12 +1222,11 @@ class Company {
   /**
    * ADMIN METHODS: CR Verification
    */
-  async verifyCR(adminNotes = null) {
+  async verifyCR() {
     try {
       const updateData = {
         crVerificationStatus: 'verified',
         crVerifiedAt: new Date().toISOString(),
-        crVerificationNotes: adminNotes,
         isVerified: true,
         pendingCredits: 25500, // Add credits after CR validation
         creditBalance: this.creditBalance + 25500,
@@ -1420,8 +1268,6 @@ class Company {
   async contactAdmin(message) {
     try {
       const updateData = {
-        adminContactRequested: true,
-        adminNotes: message,
         updatedAt: new Date().toISOString()
       };
 
@@ -1622,9 +1468,10 @@ class Company {
       };
 
       const updatedBrands = [...this.brands, brand];
-      
+
       const updateData = {
         brands: updatedBrands,
+        numberOfBands: updatedBrands.length, // Auto-update count
         updatedAt: new Date().toISOString()
       };
 
@@ -1646,7 +1493,8 @@ class Company {
   async addLocation(locationData) {
     try {
       // Check if company can add more locations
-      if (this.locations.length >= this.maxLocations) {
+      const maxLoc = this.maxLocations || 1;
+      if (this.locations.length >= maxLoc) {
         throw new Error('Location limit reached for current plan');
       }
 
@@ -1657,9 +1505,10 @@ class Company {
       };
 
       const updatedLocations = [...this.locations, location];
-      
+
       return await this.update({
         locations: updatedLocations,
+        numberOfBranches: updatedLocations.length, // Auto-update count
         updatedAt: new Date().toISOString()
       });
     } catch (error) {
@@ -1676,7 +1525,7 @@ class Company {
       // Inherit data from onboarding
       const profileData = {
         userId: userId,
-        trialStartAt: new Date().toISOString(), // Set trial start date
+        trialStartDate: new Date().toISOString(), // Set trial start date
         primaryIndustry: onboardingData.selectedIndustries[0] || null,
         secondaryIndustries: onboardingData.selectedIndustries.slice(1) || [],
         typicalHiringRoles: onboardingData.typicalHiringRoles || onboardingData.selectedRoles,
@@ -1754,16 +1603,25 @@ class Company {
 
       // Map contact fields to adminDetails if they're provided
       const processedUpdateData = { ...updateData };
-      
-      if (updateData.contactPerson || updateData.contactEmail || updateData.contactPhone || updateData.contactRole) {
+
+      if (updateData.contactPerson || updateData.contactEmail || updateData.contactPhone || updateData.contactRole ||
+          updateData.adminName || updateData.adminEmail || updateData.adminPhone || updateData.adminRole) {
         processedUpdateData.adminDetails = {
           ...this.adminDetails,
-          fullName: updateData.contactPerson || this.adminDetails?.fullName,
-          email: updateData.contactEmail || this.adminDetails?.email,
-          phone: updateData.contactPhone || this.adminDetails?.phone,
-          role: updateData.contactRole || this.adminDetails?.role,
-          position: updateData.contactRole || this.adminDetails?.position
+          fullName: updateData.contactPerson || updateData.adminName || this.adminDetails?.fullName,
+          email: updateData.contactEmail || updateData.adminEmail || this.adminDetails?.email,
+          phone: updateData.contactPhone || updateData.adminPhone || this.adminDetails?.phone,
+          role: updateData.contactRole || updateData.adminRole || this.adminDetails?.role,
+          position: updateData.contactRole || updateData.adminRole || this.adminDetails?.position
         };
+      }
+
+      // Auto-sync counts when brands or locations are updated
+      if (updateData.brands && Array.isArray(updateData.brands)) {
+        processedUpdateData.numberOfBands = updateData.brands.length;
+      }
+      if (updateData.locations && Array.isArray(updateData.locations)) {
+        processedUpdateData.numberOfBranches = updateData.locations.length;
       }
 
       const updatedCompany = await databaseService.update(COLLECTIONS.COMPANIES, this.id, processedUpdateData);
@@ -1865,7 +1723,6 @@ class Company {
         { field: 'isActive', operator: '==', value: true },
         { field: 'isVerified', operator: '==', value: true }
       ], 
-      { field: 'averageRating', direction: 'desc' },
       limit);
 
       return companies.map(companyData => new Company(companyData));
@@ -1891,15 +1748,89 @@ class Company {
   }
 
   /**
+   * Increment job count for specific brand
+   */
+  async incrementBrandJobCount(brandLocationId, isActive = true) {
+    try {
+      // Find the location and its associated brand
+      const location = this.locations.find(loc => loc.id === brandLocationId);
+      if (!location || !location.brand) {
+        console.log('Location or brand not found for brandLocationId:', brandLocationId);
+        return await this.incrementJobCount(); // Fallback to company-level increment
+      }
+
+      // Find the brand in the brands array
+      const brandIndex = this.brands.findIndex(brand => brand.name === location.brand);
+      if (brandIndex === -1) {
+        console.log('Brand not found in brands array:', location.brand);
+        return await this.incrementJobCount(); // Fallback to company-level increment
+      }
+
+      // Update the brand's job counts
+      const updatedBrands = [...this.brands];
+      updatedBrands[brandIndex] = {
+        ...updatedBrands[brandIndex],
+        totalJobs: (updatedBrands[brandIndex].totalJobs || 0) + 1,
+        activeJobs: isActive ? (updatedBrands[brandIndex].activeJobs || 0) + 1 : (updatedBrands[brandIndex].activeJobs || 0)
+      };
+
+      // Update both brand-level and company-level counters
+      return await this.update({
+        brands: updatedBrands,
+        totalJobsPosted: this.totalJobsPosted + 1,
+        activeJobs: isActive ? this.activeJobs + 1 : this.activeJobs
+      });
+    } catch (error) {
+      console.error('Error incrementing brand job count:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Decrement active job count for specific brand (when job is closed/filled)
+   */
+  async decrementBrandActiveJobCount(brandLocationId) {
+    try {
+      // Find the location and its associated brand
+      const location = this.locations.find(loc => loc.id === brandLocationId);
+      if (!location || !location.brand) {
+        console.log('Location or brand not found for brandLocationId:', brandLocationId);
+        return await this.update({ activeJobs: Math.max(0, this.activeJobs - 1) });
+      }
+
+      // Find the brand in the brands array
+      const brandIndex = this.brands.findIndex(brand => brand.name === location.brand);
+      if (brandIndex === -1) {
+        console.log('Brand not found in brands array:', location.brand);
+        return await this.update({ activeJobs: Math.max(0, this.activeJobs - 1) });
+      }
+
+      // Update the brand's active job count
+      const updatedBrands = [...this.brands];
+      updatedBrands[brandIndex] = {
+        ...updatedBrands[brandIndex],
+        activeJobs: Math.max(0, (updatedBrands[brandIndex].activeJobs || 0) - 1)
+      };
+
+      // Update both brand-level and company-level counters
+      return await this.update({
+        brands: updatedBrands,
+        activeJobs: Math.max(0, this.activeJobs - 1)
+      });
+    } catch (error) {
+      console.error('Error decrementing brand active job count:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update company rating
    */
   async updateRating(newRating) {
     try {
       const totalReviews = this.totalReviews + 1;
-      const averageRating = ((this.averageRating * this.totalReviews) + newRating) / totalReviews;
-      
+
       return await this.update({
-        averageRating: Math.round(averageRating * 10) / 10,
         totalReviews: totalReviews
       });
     } catch (error) {
@@ -1955,38 +1886,32 @@ class Company {
       geographicalPresence: this.geographicalPresence,
       adminDetails: this.adminDetails,
       
-      // CSV-specific fields
+      // Consolidated fields
       industry: this.industry,
-      roles: this.roles,
       registrationDate: this.registrationDate,
-      numberOfBands: this.numberOfBands,
-      numberOfBranches: this.numberOfBranches,
+      numberOfBands: this.numberOfBands || 0,
+      numberOfBranches: this.numberOfBranches || 0,
       lastActiveDate: this.lastActiveDate,
-      numberOfJobPosts: this.numberOfJobPosts,
-      totalInstantHires: this.totalInstantHires,
+      totalJobsPosted: this.totalJobsPosted,
+      totalHires: this.totalHires,
       totalInterviews: this.totalInterviews,
-      spentOnHiring: this.spentOnHiring,
-      usedFreeTrial: this.usedFreeTrial,
+      totalSpentOnHiring: this.totalSpentOnHiring,
+      hasUsedFreeTrial: this.hasUsedFreeTrial,
       previousPlansPurchases: this.previousPlansPurchases,
       
-      // Enhanced Analytics & Structure
-      companyAnalytics: this.companyAnalytics,
-      industryDetails: this.industryDetails,
-      organizationStructure: this.organizationStructure,
       
       // Business Details
       brands: this.brands,
       primaryBrand: this.primaryBrand,
-      brandPortfolio: this.brandPortfolio,
       locations: this.locations,
       teamMembers: this.teamMembers,
-      maxLocations: this.maxLocations,
+      maxLocations: this.maxLocations || 1,
       
       // Subscription & Payment with Enhanced Pricing
       subscriptionPlan: this.subscriptionPlan,
       subscriptionStatus: this.subscriptionStatus,
       pricingDetails: this.pricingDetails,
-      trialStartAt: this.trialStartAt,
+      trialStartDate: this.trialStartDate,
       trialEndDate: this.trialEndDate,
       trialExpired: this.trialExpired,
       paymentMethods: this.paymentMethods,
@@ -1997,7 +1922,6 @@ class Company {
       billingCycle: this.billingCycle,
       
       // Banking & Wallet
-      bankDetails: this.bankDetails,
       withdrawalSettings: this.withdrawalSettings,
       creditBalance: this.creditBalance,
       walletHistory: this.walletHistory,
@@ -2010,10 +1934,8 @@ class Company {
       // Usage & Limits with Analytics
       usageStats: this.usageStats,
       planLimits: this.planLimits,
-      analyticsData: this.analyticsData,
       
       // Performance Dashboard & Health Score
-      performanceDashboard: this.performanceDashboard,
       healthScore: this.healthScore,
       
       // Terms & Profile
@@ -2037,19 +1959,15 @@ class Company {
       // Custom Plans & Admin
       customPlanRequested: this.customPlanRequested,
       customPlanDetails: this.customPlanDetails,
-      adminContactRequested: this.adminContactRequested,
-      adminNotes: this.adminNotes,
       
       // System Fields
       isActive: this.isActive,
       lastLoginAt: this.lastLoginAt,
       
-      // Performance Metrics
+      // Performance Metrics - use consolidated fields
       totalJobsPosted: this.totalJobsPosted,
       activeJobs: this.activeJobs,
       totalHires: this.totalHires,
-      successfulMatches: this.successfulMatches,
-      averageRating: this.averageRating,
       totalReviews: this.totalReviews,
       
       // Metadata
@@ -2088,8 +2006,8 @@ class Company {
       contactRole: this.adminDetails?.role,
       
       // Business structure
-      numberOfBands: this.numberOfBands,
-      numberOfBranches: this.numberOfBranches,
+      numberOfBands: this.numberOfBands || 0,
+      numberOfBranches: this.numberOfBranches || 0,
       
       // Activity metrics
       registrationDate: this.registrationDate,
@@ -2102,7 +2020,7 @@ class Company {
       spentOnHiring: this.spentOnHiring,
       
       // Subscription info
-      usedFreeTrial: this.usedFreeTrial,
+      usedFreeTrial: this.hasUsedFreeTrial,
       previousPlansPurchases: this.previousPlansPurchases,
       
       // Brands and branding
@@ -2110,26 +2028,20 @@ class Company {
         id: brand.id,
         name: brand.name,
         logo: brand.logo,
-        industry: brand.industry
+        industry: brand.industry,
+        role: brand.role,
+        skills: brand.skills,
+        totalJobs: brand.totalJobs || 0,
+        activeJobs: brand.activeJobs || 0
       })),
       primaryBrand: this.primaryBrand,
       
       // Business locations and team
       locations: this.locations,
       teamMembers: this.teamMembers,
-      maxLocations: this.maxLocations,
+      maxLocations: this.maxLocations || 1,
       
       // Industry & Organization Info
-      industryDetails: {
-        primaryIndustry: this.industryDetails.primaryIndustry,
-        businessType: this.industryDetails.businessType,
-        industrySize: this.industryDetails.industrySize
-      },
-      organizationStructure: {
-        numberOfBands: this.organizationStructure.numberOfBands,
-        numberOfBranches: this.organizationStructure.numberOfBranches,
-        operationalScale: this.organizationStructure.operationalScale
-      },
       
       // Subscription info with pricing details
       subscriptionPlan: this.subscriptionPlan,
@@ -2146,20 +2058,11 @@ class Company {
         conversionRates: this.usageStats.conversionRates
       },
       
-      // Performance Dashboard (Public metrics)
-      performanceMetrics: {
-        totalJobsPosted: this.totalJobsPosted,
-        averageRating: this.averageRating,
-        totalReviews: this.totalReviews,
-        hiringVelocity: this.performanceDashboard.kpis.hiringVelocity,
-        employerBrandScore: this.performanceDashboard.kpis.employerBrandScore
-      },
       
       // Health Score (Public view)
       healthScore: {
         overall: this.healthScore,
         categories: {
-          hiringEfficiency: 0, // Placeholder, needs actual implementation
           candidateExperience: 0 // Placeholder, needs actual implementation
         }
       },
@@ -2176,15 +2079,6 @@ class Company {
       // System status
       isActive: this.isActive,
       
-      // Company Analytics (Public safe)
-      companyAnalytics: {
-        registrationDate: this.companyAnalytics.registrationDate,
-        hasUsedFreeTrial: this.companyAnalytics.hasUsedFreeTrial,
-        performanceMetrics: {
-          hireSuccessRate: this.companyAnalytics.performanceMetrics.hireSuccessRate,
-          candidateQualityScore: this.companyAnalytics.performanceMetrics.candidateQualityScore
-        }
-      },
       
       // Timestamps
       createdAt: this.createdAt,
@@ -2208,18 +2102,17 @@ class Company {
       geographicalPresence: this.geographicalPresence,
       adminDetails: this.adminDetails,
       
-      // CSV-specific fields
+      // Consolidated fields
       industry: this.industry,
-      roles: this.roles,
       registrationDate: this.registrationDate,
-      numberOfBands: this.numberOfBands,
-      numberOfBranches: this.numberOfBranches,
+      numberOfBands: this.numberOfBands || 0,
+      numberOfBranches: this.numberOfBranches || 0,
       lastActiveDate: this.lastActiveDate,
-      numberOfJobPosts: this.numberOfJobPosts,
-      totalInstantHires: this.totalInstantHires,
+      totalJobsPosted: this.totalJobsPosted,
+      totalHires: this.totalHires,
       totalInterviews: this.totalInterviews,
-      spentOnHiring: this.spentOnHiring,
-      usedFreeTrial: this.usedFreeTrial,
+      totalSpentOnHiring: this.totalSpentOnHiring,
+      hasUsedFreeTrial: this.hasUsedFreeTrial,
       previousPlansPurchases: this.previousPlansPurchases,
       
       // Business structure
@@ -2227,11 +2120,6 @@ class Company {
       locations: this.locations,
       teamMembers: this.teamMembers,
       
-      // Enhanced Company Analytics
-      companyAnalytics: this.companyAnalytics,
-      industryDetails: this.industryDetails,
-      organizationStructure: this.organizationStructure,
-      brandPortfolio: this.brandPortfolio,
       
       // Complete subscription details with pricing model
       subscriptionPlan: this.subscriptionPlan,
@@ -2249,10 +2137,8 @@ class Company {
       pendingCredits: this.pendingCredits,
       usageStats: this.usageStats,
       planLimits: this.planLimits,
-      analyticsData: this.analyticsData,
       
       // Performance Dashboard
-      performanceDashboard: this.performanceDashboard,
       healthScore: this.healthScore,
       
       // Verification details
@@ -2269,8 +2155,6 @@ class Company {
       
       // Admin requests
       customPlanRequested: this.customPlanRequested,
-      adminContactRequested: this.adminContactRequested,
-      adminNotes: this.adminNotes,
       
       // System information
       isActive: this.isActive,
@@ -2281,7 +2165,6 @@ class Company {
       activeJobs: this.activeJobs,
       totalHires: this.totalHires,
       successfulMatches: this.successfulMatches,
-      averageRating: this.averageRating,
       totalReviews: this.totalReviews,
       
       // Real-time trial status
