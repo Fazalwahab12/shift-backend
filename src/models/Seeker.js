@@ -170,7 +170,18 @@ class Seeker {
         { field: 'userId', operator: '==', value: userId }
       ]);
 
-      return seekers.length > 0 ? new Seeker(seekers[0]) : null;
+      if (seekers.length === 0) {
+        return null;
+      }
+
+      if (seekers.length > 1) {
+        console.warn(`⚠️  CRITICAL: Multiple seekers found for userId: ${userId}`);
+        // Return the most recently created seeker to handle duplicates
+        const sortedSeekers = seekers.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        return new Seeker(sortedSeekers[0]);
+      }
+
+      return new Seeker(seekers[0]);
     } catch (error) {
       console.error('Error finding seeker by user ID:', error);
       throw error;

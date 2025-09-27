@@ -140,6 +140,8 @@ class JobApplication {
           this.jobData = {
             id: job.id,
             jobId: job.jobId,
+            userId: job.userId,
+            companyId: job.companyId,
             roleName: job.roleName,
             jobSummary: job.jobSummary,
             jobCoverImage: job.jobCoverImage,
@@ -357,43 +359,45 @@ class JobApplication {
   static async findBySeekerId(seekerId, options = {}) {
     try {
       const filters = [{ field: 'seekerId', operator: '==', value: seekerId }];
-      
+
       if (options.status) {
         filters.push({ field: 'status', operator: '==', value: options.status });
       }
-      
+
       if (options.jobId) {
         filters.push({ field: 'jobId', operator: '==', value: options.jobId });
       }
-      
+
       if (options.companyId) {
         filters.push({ field: 'companyId', operator: '==', value: options.companyId });
       }
-      
+
       const applications = await databaseService.query(
-        COLLECTIONS.JOB_APPLICATIONS, 
+        COLLECTIONS.JOB_APPLICATIONS,
         filters,
         { field: 'appliedAt', direction: 'desc' },
         options.limit || 50
       );
-      
+
       // Populate data for all applications
       const populatedApplications = [];
       for (const appData of applications) {
-        console.log(`🔍 JobApplication.findBySeekerId - Raw appData ID: ${appData.id}, type: ${typeof appData.id}`);
-        
-        // CRITICAL FIX: Ensure document ID is always set
+        // Ensure document ID is always set
         if (!appData.id) {
           console.error(`❌ Missing ID in application data:`, appData);
         }
-        
+
+        // Double-check seekerId matches (safety net)
+        if (appData.seekerId !== seekerId) {
+          console.error(`❌ CRITICAL: SeekerId mismatch! Expected: ${seekerId}, Got: ${appData.seekerId}`);
+          continue; // Skip this application
+        }
+
         const app = new JobApplication(appData);
-        console.log(`🔍 JobApplication.findBySeekerId - After constructor ID: ${app.id}`);
-        
         await app.populateData();
         populatedApplications.push(app);
       }
-      
+
       return populatedApplications;
     } catch (error) {
       console.error('Error finding seeker applications:', error);

@@ -253,7 +253,7 @@ class JobApplicationController {
 
       // Use seeker document ID instead of user ID
       const applications = await JobApplication.findBySeekerId(seeker.id, options);
-      
+
       res.status(200).json({
         success: true,
         message: 'Applications retrieved successfully',
@@ -1990,7 +1990,7 @@ class JobApplicationController {
         success: true,
         message: 'Seeker applications retrieved successfully',
         data: {
-          applications: applications.map(app => app.toJSON())
+          applications: companyApplications.map(app => app.toJSON())
         }
       });
 
