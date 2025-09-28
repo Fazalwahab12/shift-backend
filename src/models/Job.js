@@ -337,6 +337,8 @@ class Job {
       governorate: this.governorate,
       jobCoverImage: this.jobCoverImage,
       jobSummary: this.jobSummary,
+      dressCode: this.dressCode,
+      dressCodeGuideline: this.dressCodeGuideline,
       hiringType: this.hiringType,
       jobDuration: this.jobDuration,
       shiftTypes: this.shiftTypes,
@@ -487,51 +489,32 @@ class Job {
    */
   static async findByJobId(jobId) {
     try {
-      console.log(`🔍 Searching for job with jobId: ${jobId}`);
-      
       // Try different approaches to find the job
       let job = null;
-      
+
       // Method 1: Simple query by jobId only
       try {
         const jobs = await databaseService.query(
           COLLECTIONS.JOBS,
           [{ field: 'jobId', operator: '==', value: jobId }]
         );
-        
-        console.log(`🔍 Method 1 - Simple query: Found ${jobs.length} jobs`);
-        
+
         if (jobs.length > 0) {
           job = jobs[0];
-          console.log(`🔍 Job found via simple query:`, {
-            jobId: job.jobId,
-            isActive: job.isActive,
-            jobStatus: job.jobStatus,
-            companyId: job.companyId,
-            userId: job.userId,
-            roleName: job.roleName
-          });
         }
       } catch (queryError) {
-        console.error('❌ Simple query failed:', queryError);
+        // Query failed, try alternative method
       }
       
       // Method 2: If simple query fails, try getById if jobId looks like an ID
       if (!job && (jobId.length > 10)) {
         try {
-          console.log(`🔍 Method 2 - Trying getById with: ${jobId}`);
           const directJob = await databaseService.getById(COLLECTIONS.JOBS, jobId);
           if (directJob) {
             job = directJob;
-            console.log(`🔍 Job found via getById:`, {
-              id: job.id,
-              jobId: job.jobId,
-              companyId: job.companyId,
-              roleName: job.roleName
-            });
           }
         } catch (getByIdError) {
-          console.error('❌ getById failed:', getByIdError.message);
+          // getById failed, continue to return null
         }
       }
       
