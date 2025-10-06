@@ -19,7 +19,7 @@ class Seeker {
     this.email = data.email || null;
     this.profilePhoto = data.profilePhoto || null; // Upload photo URL
     this.bio = data.bio || null; // Multi-line bio text
-    this.educationalLevel = data.educationalLevel || null; // 'High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'
+    this.educationalLevel = data.educationalLevel || null; // 'No Degree', 'General Diploma', 'Higher Diploma', 'Bachelors Degree', 'Masters Degree'
     
     // VIDEO MANAGEMENT SYSTEM
     this.profileVideo = data.profileVideo || null; // Final video URL (set by admin)
@@ -43,7 +43,7 @@ class Seeker {
     
     // STEP 3: Availability & Preferences  
     this.availability = data.availability || null; // 'Public Holidays', 'Both', 'Weekends'
-    this.currentStatus = data.currentStatus || null; // 'Student', 'Graduate', 'Working', 'Unemployed', 'Other'
+    this.currentStatus = data.currentStatus || null; // 'Student', 'Employed', 'Job Seeker'
     this.workType = data.workType || null; // 'Hourly Work (shifts or events)', 'Short-Term Hire (1–3 months)', 'Full-Time Work'
     this.preferredLocations = data.preferredLocations || []; // ['Seeb', 'Barka', 'Muscat', etc.]
     this.languages = data.languages || []; // ['Arabic', 'English', 'Hindi', etc.] - multiple selection

@@ -2796,6 +2796,410 @@ class CompanyController {
   }
 
   /**
+   * Check Thawani payment status
+   * GET /api/payment/status/:sessionId
+   */
+  static async checkPaymentStatus(req, res) {
+    try {
+      const { sessionId } = req.params;
+
+      // Fetch session details from Thawani
+      const thawaniConfig = {
+        apiKey: process.env.THAWANI_SECRET || process.env.THAWANI_SECRET_KEY,
+        baseUrl: process.env.THAWANI_BASE_URL || 'https://uatcheckout.thawani.om/api/v1'
+      };
+
+      const response = await fetch(`${thawaniConfig.baseUrl}/checkout/session/${sessionId}`, {
+        method: 'GET',
+        headers: {
+          'thawani-api-key': thawaniConfig.apiKey
+        }
+      });
+
+      if (!response.ok) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found'
+        });
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        const paymentData = result.data;
+
+        // If payment is successful, process it
+        if (paymentData.payment_status === 'paid') {
+          // Find company by client_reference_id (format: companyId_timestamp)
+          const companyId = paymentData.client_reference_id.split('_')[0];
+          const company = await Company.findById(companyId);
+
+          if (company) {
+            // Process the payment
+            await company.processSuccessfulPayment(sessionId, paymentData);
+          }
+        }
+
+        res.status(200).json({
+          success: true,
+          data: {
+            sessionId: paymentData.session_id,
+            paymentStatus: paymentData.payment_status,
+            amount: paymentData.total_amount / 1000, // Convert from baisa to OMR
+            currency: paymentData.currency,
+            metadata: paymentData.metadata
+          }
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid session'
+        });
+      }
+
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  /**
+   * Redirect to app after successful payment
+   * GET /api/payment/success-redirect
+   */
+  static async paymentSuccessRedirect(req, res) {
+    try {
+      let { session_id } = req.query;
+
+      // Handle case where Thawani doesn't replace the placeholder in test mode
+      if (!session_id || session_id === '{CHECKOUT_SESSION_ID}') {
+        console.log('Placeholder detected, fetching latest pending payment from database...');
+
+        // Get all companies and find the most recent pending payment
+        const db = require('../config/database').databaseService.db;
+        const companiesSnapshot = await db.collection('companies').get();
+
+        let latestPayment = null;
+        let latestTimestamp = null;
+
+        for (const companyDoc of companiesSnapshot.docs) {
+          const companyData = companyDoc.data();
+          if (companyData.pendingPayments && Array.isArray(companyData.pendingPayments)) {
+            // Find pending payments
+            const pendingPayments = companyData.pendingPayments.filter(p => p.status === 'pending');
+
+            for (const payment of pendingPayments) {
+              const paymentTime = payment.createdAt?.toDate?.() || new Date(payment.createdAt);
+              if (!latestTimestamp || paymentTime > latestTimestamp) {
+                latestTimestamp = paymentTime;
+                latestPayment = payment;
+              }
+            }
+          }
+        }
+
+        if (latestPayment && latestPayment.sessionId) {
+          session_id = latestPayment.sessionId;
+          console.log('Retrieved session_id from pending payment:', session_id);
+        } else {
+          console.error('No pending payments found in database');
+          return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Session Not Found</title>
+              <style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  min-height: 100vh;
+                  margin: 0;
+                  padding: 20px;
+                  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                  text-align: center;
+                }
+                .container {
+                  background: rgba(255, 255, 255, 0.95);
+                  border-radius: 20px;
+                  padding: 40px;
+                  max-width: 400px;
+                  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                  color: #333;
+                }
+                h1 { color: #FF9800; margin: 0 0 10px 0; font-size: 24px; }
+                p { color: #666; line-height: 1.6; }
+                .button {
+                  display: inline-block;
+                  margin-top: 20px;
+                  padding: 15px 30px;
+                  background: #F05A2B;
+                  color: white;
+                  text-decoration: none;
+                  border-radius: 10px;
+                  font-weight: 600;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <h1>⚠️ Payment Session Not Found</h1>
+                <p>Unable to verify payment. Please check your account or contact support.</p>
+                <a href="shift://payment/cancel" class="button">Return to App</a>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+      }
+
+      console.log('✅ Verifying payment status for session_id:', session_id);
+
+      // Call our existing payment status endpoint
+      const baseUrl = process.env.BACKEND_URL || 'https://62ff4cd87704.ngrok-free.app';
+      const statusResponse = await fetch(`${baseUrl}/api/payment/status/${session_id}`);
+      const statusResult = await statusResponse.json();
+
+      const paymentStatus = statusResult?.data?.paymentStatus || 'unknown';
+      console.log('💳 Payment status from /api/payment/status:', paymentStatus);
+
+      // Simple logic: paid = success, unpaid/anything else = failed
+      let statusIcon, statusTitle, statusMessage, statusColor, deepLink;
+
+      if (paymentStatus === 'paid') {
+        // SUCCESS - redirect to dashboard
+        statusIcon = '✅';
+        statusTitle = 'Payment Successful!';
+        statusMessage = 'Your payment has been confirmed. Your plan has been upgraded.';
+        statusColor = '#4CAF50';
+        deepLink = 'shift://dashboard';
+      } else {
+        // FAILED - redirect to cancel/try again
+        statusIcon = '❌';
+        statusTitle = 'Payment Failed';
+        statusMessage = 'Your payment could not be processed. Please try again.';
+        statusColor = '#FF4444';
+        deepLink = 'shift://payment/cancel';
+      }
+
+      console.log('🔗 Deep link created:', deepLink);
+
+      // Send HTML page that shows status and redirects to app dashboard
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${statusTitle}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              padding: 20px;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              text-align: center;
+            }
+            .container {
+              background: rgba(255, 255, 255, 0.95);
+              border-radius: 20px;
+              padding: 40px;
+              max-width: 400px;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+              color: #333;
+            }
+            .status-icon {
+              font-size: 80px;
+              margin-bottom: 20px;
+            }
+            h1 {
+              margin: 0 0 10px 0;
+              font-size: 28px;
+              color: ${statusColor};
+            }
+            p {
+              color: #666;
+              line-height: 1.6;
+              margin: 15px 0;
+            }
+            .button {
+              display: inline-block;
+              margin-top: 20px;
+              padding: 15px 30px;
+              background: #F05A2B;
+              color: white;
+              text-decoration: none;
+              border-radius: 10px;
+              font-weight: 600;
+              transition: background 0.3s;
+            }
+            .button:hover {
+              background: #d94a1c;
+            }
+            .loading {
+              margin-top: 20px;
+              color: #999;
+              font-size: 14px;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            .spinner {
+              border: 3px solid #f3f3f3;
+              border-top: 3px solid #F05A2B;
+              border-radius: 50%;
+              width: 40px;
+              height: 40px;
+              animation: spin 1s linear infinite;
+              margin: 20px auto;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="status-icon">${statusIcon}</div>
+            <h1>${statusTitle}</h1>
+            <p>${statusMessage}</p>
+            <p class="loading">Redirecting to Shift app...</p>
+            <a href="${deepLink}" class="button">Return to Dashboard</a>
+            <p style="font-size: 12px; margin-top: 30px; color: #999;">
+              If the app doesn't open automatically, click the button above.
+            </p>
+          </div>
+          <script>
+            // Wait 2 seconds to show the message, then redirect
+            setTimeout(function() {
+              window.location.href = '${deepLink}';
+            }, 2000);
+
+            // Fallback: Try again after another delay
+            setTimeout(function() {
+              window.location.href = '${deepLink}';
+            }, 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('Error in payment success redirect:', error);
+      res.status(500).send('Redirect failed');
+    }
+  }
+
+  /**
+   * Redirect to app after cancelled payment
+   * GET /api/payment/cancel-redirect
+   */
+  static async paymentCancelRedirect(req, res) {
+    try {
+      const deepLink = 'shift://payment/cancel';
+
+      // Send HTML page that attempts deep link and shows fallback
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Payment Cancelled</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+              margin: 0;
+              padding: 20px;
+              background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+              color: white;
+              text-align: center;
+            }
+            .container {
+              background: rgba(255, 255, 255, 0.95);
+              border-radius: 20px;
+              padding: 40px;
+              max-width: 400px;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+              color: #333;
+            }
+            .cancel-icon {
+              font-size: 80px;
+              margin-bottom: 20px;
+            }
+            h1 {
+              margin: 0 0 10px 0;
+              font-size: 28px;
+              color: #FF9800;
+            }
+            p {
+              color: #666;
+              line-height: 1.6;
+              margin: 15px 0;
+            }
+            .button {
+              display: inline-block;
+              margin-top: 20px;
+              padding: 15px 30px;
+              background: #F05A2B;
+              color: white;
+              text-decoration: none;
+              border-radius: 10px;
+              font-weight: 600;
+              transition: background 0.3s;
+            }
+            .button:hover {
+              background: #d94a1c;
+            }
+            .loading {
+              margin-top: 20px;
+              color: #999;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="cancel-icon">⚠️</div>
+            <h1>Payment Cancelled</h1>
+            <p>You cancelled the payment. No charges have been made.</p>
+            <p class="loading">Redirecting to Shift app...</p>
+            <a href="${deepLink}" class="button">Return to Shift App</a>
+          </div>
+          <script>
+            // Attempt to open the app immediately
+            window.location.href = '${deepLink}';
+
+            // Fallback: Try again after a short delay
+            setTimeout(function() {
+              window.location.href = '${deepLink}';
+            }, 1000);
+          </script>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error('Error in payment cancel redirect:', error);
+      res.status(500).send('Redirect failed');
+    }
+  }
+
+  /**
    * Get current plan status and expiration info
    * GET /api/companies/:companyId/plan-status
    */
@@ -2881,130 +3285,94 @@ class CompanyController {
       const Job = require('../models/Job');
       const Company = require('../models/Company');
 
-      // Get all active jobs that match the skills/roles
-      const filters = {
-        jobStatus: 'published'
-      };
+      // Get all companies with their brands
+      const allCompanies = await Company.getAll();
+      console.log('📊 Total companies found:', allCompanies.length);
 
-      const matchingJobs = await Job.searchJobs(filters, parseInt(limit) * 3, parseInt(offset));
-
-      // Score and group jobs by brand
-      const brandScores = new Map();
-      
-      for (const job of matchingJobs) {
-        if (!job.brandName) continue;
-
-        let score = 0;
-        const jobRoles = job.roleName ? [job.roleName.toLowerCase()] : [];
-        const jobSkills = job.requiredSkills ? job.requiredSkills.map(s => s.toLowerCase()) : [];
-
-        // Score based on role match
-        for (const role of roleArray) {
-          if (jobRoles.some(jr => jr.includes(role.toLowerCase()) || role.toLowerCase().includes(jr))) {
-            score += 10; // High score for role match
-          }
-        }
-
-        // Score based on skill match
-        for (const skill of skillArray) {
-          if (jobSkills.some(js => js.includes(skill.toLowerCase()) || skill.toLowerCase().includes(js))) {
-            score += 5; // Medium score for skill match
-          }
-        }
-
-        if (score > 0) {
-          const brandKey = job.brandName;
-          if (!brandScores.has(brandKey)) {
-            brandScores.set(brandKey, {
-              brandName: job.brandName,
-              companyId: job.companyId,
-              companyName: job.companyName,
-              score: 0,
-              jobCount: 0,
-              recentJobsCount: 0,
-              governorates: new Set()
-            });
-          }
-
-          const brand = brandScores.get(brandKey);
-          brand.score += score;
-          brand.jobCount += 1;
-          
-          if (job.governorate) {
-            brand.governorates.add(job.governorate);
-          }
-
-          // Check for recent jobs (last 30 days)
-          const jobDate = new Date(job.publishedAt);
-          const thirtyDaysAgo = new Date();
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          if (jobDate > thirtyDaysAgo) {
-            brand.recentJobsCount += 1;
-          }
-        }
-      }
-
-      // Convert to array and get actual company locations
       let brands = [];
-      
-      for (const brand of brandScores.values()) {
-        try {
-          // Get actual company locations for this brand
-          const Company = require('../models/Company');
-          
-          // Try both findByUserId and findById methods
-          let company = await Company.findByUserId(brand.companyId);
-          if (!company) {
-            company = await Company.findById(brand.companyId);
-          }
-          
-          let actualLocations = [];
-          let locationCount = 0;
 
-          if (company && company.locations && company.locations.length > 0) {
-            // Filter locations for this specific brand
+      // Iterate through each company and their brands
+      for (const company of allCompanies) {
+        if (!company.brands || company.brands.length === 0) continue;
+
+        console.log('🏢 Processing company:', company.companyName, 'with', company.brands.length, 'brands');
+
+        for (let brandIndex = 0; brandIndex < company.brands.length; brandIndex++) {
+          const companyBrand = company.brands[brandIndex];
+
+          // Calculate match score based on brand's roles and skills
+          let matchScore = 0;
+          const brandRoles = companyBrand.roles || (companyBrand.role ? companyBrand.role.split(',').map(r => r.trim()) : []);
+          const brandSkills = companyBrand.skills || [];
+
+          // Score based on role match
+          for (const role of roleArray) {
+            if (brandRoles.some(br => br.toLowerCase().includes(role.toLowerCase()) || role.toLowerCase().includes(br.toLowerCase()))) {
+              matchScore += 10;
+            }
+          }
+
+          // Score based on skill match
+          for (const skill of skillArray) {
+            if (brandSkills.some(bs => bs.toLowerCase().includes(skill.toLowerCase()) || skill.toLowerCase().includes(bs.toLowerCase()))) {
+              matchScore += 5;
+            }
+          }
+
+          // Only include brands with matching roles/skills
+          if (matchScore === 0) continue;
+
+          // Get jobs for this brand to calculate activity metrics
+          const brandJobs = await Job.searchJobs({
+            jobStatus: 'published',
+            brandName: companyBrand.name
+          }, 100, 0);
+
+          const recentJobsCount = brandJobs.filter(job => {
+            const jobDate = new Date(job.publishedAt);
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            return jobDate > thirtyDaysAgo;
+          }).length;
+
+          // Get brand-specific locations
+          let actualLocations = [];
+          if (company.locations && company.locations.length > 0) {
             actualLocations = company.locations.filter(location => {
-              return !location.brand || location.brand.toLowerCase() === brand.brandName.toLowerCase();
+              return !location.brand || location.brand.toLowerCase() === companyBrand.name.toLowerCase();
             }).map(location => ({
               address: location.address,
-              brand: location.brand || brand.brandName,
+              brand: location.brand || companyBrand.name,
               addedAt: location.addedAt
             }));
-            
-            // If no brand-specific locations, use all company locations  
+
             if (actualLocations.length === 0) {
               actualLocations = company.locations.map(location => ({
                 address: location.address,
-                brand: location.brand || brand.brandName,
+                brand: location.brand || companyBrand.name,
                 addedAt: location.addedAt
               }));
             }
-            
-            locationCount = actualLocations.length;
           }
 
-          // Calculate activity score: job count + location count + recent activity bonus
-          const activityScore = (brand.jobCount * 2) + (locationCount * 3) + (brand.recentJobsCount * 5);
-          
+          const activityScore = (brandJobs.length * 2) + (actualLocations.length * 3) + (recentJobsCount * 5);
+
+          // Generate proper brandId using the brand index
+          const brandId = `${company.id}-brand-${brandIndex}`;
+          console.log('✅ Generated brandId:', brandId, 'for brand:', companyBrand.name);
+
           brands.push({
-            brandId: `${brand.companyId}-${brand.brandName.replace(/\s+/g, '-').toLowerCase()}`,
-            brandName: brand.brandName,
-            companyId: brand.companyId,
-            companyName: brand.companyName,
-            matchScore: brand.score,
+            brandId: brandId,
+            brandName: companyBrand.name,
+            companyId: company.id,
+            companyName: company.companyName,
+            matchScore: matchScore,
             activityScore: activityScore,
-            jobCount: brand.jobCount,
-            locationCount: locationCount,
-            recentJobsCount: brand.recentJobsCount,
+            jobCount: brandJobs.length,
+            locationCount: actualLocations.length,
+            recentJobsCount: recentJobsCount,
             locations: actualLocations
           });
-
-        } catch (error) {
-          console.error(`Error fetching company data for ${brand.companyId}:`, error);
-          
-          // Skip brands without valid company data - no fallback
-          console.log(`⚠️ Skipping brand ${brand.brandName} due to company data error`);
-          continue;
         }
       }
 
@@ -3054,32 +3422,107 @@ class CompanyController {
       }
 
       const BrandFollow = require('../models/BrandFollow');
+      const Company = require('../models/Company');
       const Job = require('../models/Job');
 
-      // Extract brand information from brandId
-      const brandName = brandId.split('-').slice(1).join(' ');
-      
-      // Get brand info from a job to get company details
-      const brandJobs = await Job.searchJobs({ 
-        jobStatus: 'published',
-        brandName: brandName 
-      }, 1, 0);
+      // Extract brand information from brandId format: {companyId}-brand-{index}
+      // Example: "L8ryrT4XbKypPCPpj1UB-brand-0"
+      console.log('🔍 followBrand called with brandId:', brandId);
 
-      let companyId = null;
+      const brandIdParts = brandId.split('-brand-');
+      const companyId = brandIdParts[0];
+      const brandIndex = parseInt(brandIdParts[1]);
+
+      console.log('📊 Parsed brandId - companyId:', companyId, 'brandIndex:', brandIndex);
+
       let companyName = null;
-      
-      if (brandJobs.length > 0) {
-        companyId = brandJobs[0].companyId;
-        companyName = brandJobs[0].companyName;
+      let brandName = null;
+      let brandLogo = null;
+      let brandIndustry = null;
+      let brandRole = null;
+      let brandSkills = [];
+
+      // Fetch company details to get brand-specific information
+      const company = await Company.findById(companyId);
+      if (!company) {
+        console.log('❌ Company not found with id:', companyId);
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
       }
 
-      // Create follow record
+      console.log('✅ Company found:', company.companyName);
+      console.log('📦 Company brands array length:', company.brands?.length || 0);
+      console.log('📦 Company brands:', JSON.stringify(company.brands, null, 2));
+
+      companyName = company.companyName;
+
+      // Find the brand - first try by id field, then by index as fallback
+      let brand = null;
+      if (company.brands && company.brands.length > 0) {
+        console.log('🔍 Searching for brand with id:', brandId);
+        // Try to find by brand.id matching the full brandId
+        brand = company.brands.find(b => b.id === brandId);
+
+        if (brand) {
+          console.log('✅ Brand found by id match');
+        }
+
+        // If not found by id, try by index
+        if (!brand && !isNaN(brandIndex) && company.brands[brandIndex]) {
+          console.log('🔍 Brand not found by id, trying index:', brandIndex);
+          brand = company.brands[brandIndex];
+          console.log('✅ Brand found by index:', brand?.name);
+        }
+      }
+
+      if (!brand) {
+        console.log('❌ Brand not found!');
+        console.log('Debug info:', {
+          companyId,
+          brandId,
+          brandIndex,
+          totalBrands: company.brands?.length || 0,
+          brandIds: company.brands?.map(b => b.id) || []
+        });
+        return res.status(404).json({
+          success: false,
+          message: 'Brand not found in company',
+          debug: {
+            companyId,
+            brandId,
+            brandIndex,
+            totalBrands: company.brands?.length || 0,
+            availableBrandIds: company.brands?.map(b => b.id) || []
+          }
+        });
+      }
+
+      console.log('✅ Brand details extracted:', {
+        name: brand.name,
+        industry: brand.industry,
+        role: brand.role
+      });
+
+      // Extract brand details
+      brandName = brand.name;
+      brandLogo = brand.logo;
+      brandIndustry = brand.industry;
+      brandRole = brand.role;
+      brandSkills = brand.skills || [];
+
+      // Create follow record with complete brand details
       const followData = {
         seekerId: userId,
         brandId: brandId,
         companyId: companyId,
         brandName: brandName,
-        companyName: companyName
+        companyName: companyName,
+        brandLogo: brandLogo,
+        brandIndustry: brandIndustry,
+        brandRole: brandRole,
+        brandSkills: brandSkills
       };
 
       const brandFollow = await BrandFollow.create(followData);
@@ -3087,7 +3530,7 @@ class CompanyController {
       res.status(200).json({
         success: true,
         message: 'Brand followed successfully',
-        data: { 
+        data: {
           brandId,
           followedAt: brandFollow.followedAt
         }
@@ -3095,7 +3538,7 @@ class CompanyController {
 
     } catch (error) {
       console.error('Error following brand:', error);
-      
+
       if (error.message === 'Already following this brand') {
         return res.status(400).json({
           success: false,
@@ -3185,11 +3628,11 @@ class CompanyController {
 
       // Enrich with brand data and activity scores
       const enrichedBrands = [];
-      
+
       for (const follow of followedBrands) {
         // Get recent jobs for this brand to calculate activity
         const brandJobs = await Job.searchJobs(
-          { 
+          {
             jobStatus: 'published',
             brandName: follow.brandName
           },
@@ -3197,29 +3640,36 @@ class CompanyController {
           0
         );
 
-        if (brandJobs.length > 0) {
-          const locationCount = new Set(brandJobs.filter(j => j.governorate).map(j => j.governorate)).size;
-          const recentJobsCount = brandJobs.filter(job => {
-            const jobDate = new Date(job.publishedAt);
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            return jobDate > thirtyDaysAgo;
-          }).length;
+        // Calculate metrics even if there are no jobs
+        const locationCount = brandJobs.length > 0
+          ? new Set(brandJobs.filter(j => j.governorate).map(j => j.governorate)).size
+          : 0;
 
-          const activityScore = (brandJobs.length * 2) + (locationCount * 3) + (recentJobsCount * 5);
+        const recentJobsCount = brandJobs.filter(job => {
+          const jobDate = new Date(job.publishedAt);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return jobDate > thirtyDaysAgo;
+        }).length;
 
-          enrichedBrands.push({
-            brandId: follow.brandId,
-            brandName: follow.brandName,
-            companyId: follow.companyId,
-            companyName: follow.companyName,
-            followedAt: follow.followedAt,
-            activityScore: activityScore,
-            jobCount: brandJobs.length,
-            locationCount: locationCount,
-            recentJobsCount: recentJobsCount
-          });
-        }
+        const activityScore = (brandJobs.length * 2) + (locationCount * 3) + (recentJobsCount * 5);
+
+        // Add complete brand details including stored brand information
+        enrichedBrands.push({
+          brandId: follow.brandId,
+          brandName: follow.brandName,
+          companyId: follow.companyId,
+          companyName: follow.companyName,
+          brandLogo: follow.brandLogo,
+          brandIndustry: follow.brandIndustry,
+          brandRole: follow.brandRole,
+          brandSkills: follow.brandSkills,
+          followedAt: follow.followedAt,
+          activityScore: activityScore,
+          jobCount: brandJobs.length,
+          locationCount: locationCount,
+          recentJobsCount: recentJobsCount
+        });
       }
 
       res.status(200).json({

@@ -36,6 +36,7 @@ const interviewRoutes = require('./routes/interviewRoutes');
 const instantHireRoutes = require('./routes/instantHireRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const emailHistoryRoutes = require('./routes/emailHistoryRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 
 /**
  * Shift Backend API Server
@@ -184,6 +185,7 @@ class ShiftServer {
       this.app.use('/api/phone', phoneRoutes);
       this.app.use('/api/onboarding', onboardingRoutes);
       this.app.use('/api/seekers', seekerRoutes);
+      this.app.use('/api/payment', paymentRoutes);
       this.app.use('/api/companies', companyRoutes);
       this.app.use('/api/jobs', jobRoutes);
       this.app.use('/api/journey', userJourneyRoutes);
@@ -193,7 +195,7 @@ class ShiftServer {
       this.app.use('/api/', instantHireRoutes);
       this.app.use('/api/notifications', notificationRoutes);
       this.app.use('/api/email-history', emailHistoryRoutes);
-      console.log('✅ Database routes enabled (including chat, applications, interviews, instant hires, notifications & email history)');
+      console.log('✅ Database routes enabled (including payment, chat, applications, interviews, instant hires, notifications & email history)');
     } else {
       // Mock routes for when database is disabled
       this.app.use('/api/phone', (req, res) => {

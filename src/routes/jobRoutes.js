@@ -231,6 +231,10 @@ router.get('/search', [
     .optional()
     .isString()
     .withMessage('Roles must be a comma-separated string'),
+  query('industries')
+    .optional()
+    .isString()
+    .withMessage('Industries must be a comma-separated string'),
   query('hiringType')
     .optional()
     .isIn(['Instant Hire', 'Interview First'])

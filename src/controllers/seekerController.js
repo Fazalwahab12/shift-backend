@@ -1299,26 +1299,12 @@ class SeekerController {
         const fileName = `profiles/seekers/${timestamp}-${randomId}.${fileExtension}`;
 
         // Upload to Firebase Storage - use the storage instance directly
-        console.log('🔧 Attempting to access Firebase Storage bucket...');
-        
-        // Access Firebase Storage bucket properly
-        let bucket;
-        try {
-          // Use the configured Firebase storage instance
-          bucket = global.firebase.storage().bucket();
-          console.log('✅ Successfully accessed default Firebase Storage bucket');
-        } catch (bucketError) {
-          console.error('❌ Default bucket failed, trying with explicit name:', bucketError.message);
-          try {
-            // Try with explicit bucket name from config
-            const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'shift-66a92';
-            bucket = global.firebase.storage().bucket(bucketName);
-            console.log(`✅ Successfully accessed Firebase Storage bucket: ${bucketName}`);
-          } catch (explicitBucketError) {
-            console.error('❌ Both bucket access methods failed:', explicitBucketError.message);
-            throw new Error('Cannot access Firebase Storage bucket');
-          }
-        }
+        console.log('🔧 Accessing Firebase Storage bucket...');
+
+        // global.firebase.storage is already the storage instance (not a function)
+        const bucket = global.firebase.storage.bucket();
+        console.log('✅ Successfully accessed Firebase Storage bucket');
+
         const file = bucket.file(fileName);
         
         // Create write stream
@@ -1344,17 +1330,18 @@ class SeekerController {
 
         stream.on('finish', async () => {
           try {
-            // Make file publicly accessible
-            await file.makePublic();
-            
-            // Get public URL
-            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-            
+            // Generate a signed URL for public access (works with uniform bucket-level access)
+            const [signedUrl] = await file.getSignedUrl({
+              action: 'read',
+              expires: '03-01-2500' // Long expiration date
+            });
+
             res.status(200).json({
               success: true,
               message: 'Image uploaded successfully',
               data: {
-                imageUrl: publicUrl,
+                url: signedUrl,
+                imageUrl: signedUrl,
                 fileName: req.file.originalname,
                 fileSize: req.file.size,
                 mimeType: req.file.mimetype,
@@ -1362,10 +1349,10 @@ class SeekerController {
               }
             });
           } catch (error) {
-            console.error('Error making file public:', error);
+            console.error('Error generating signed URL:', error);
             res.status(500).json({
               success: false,
-              message: 'Failed to make image publicly accessible'
+              message: 'Failed to generate image URL'
             });
           }
         });
@@ -1884,6 +1871,7 @@ class SeekerController {
   static async getBrandRecommendations(req, res) {
     try {
       const { userId, userType } = req.user;
+      const { roles: rolesParam, skills: skillsParam, industries: industriesParam, location, q } = req.query;
 
       if (userType !== 'seeker') {
         return res.status(403).json({
@@ -1892,10 +1880,8 @@ class SeekerController {
         });
       }
 
-      // Get seeker profile to extract roles, industries, skills
-      console.log('🔍 Looking for seeker with userId:', userId);
+      // Get seeker profile
       const seeker = await Seeker.findByUserId(userId);
-      console.log('🔍 Seeker found:', seeker ? { id: seeker.id, fullName: seeker.fullName, roles: seeker.roles } : 'Not found');
 
       if (!seeker) {
         return res.status(404).json({
@@ -1904,12 +1890,13 @@ class SeekerController {
         });
       }
 
-      // Use seeker's profile data (same as recommendation pattern)
-      const roles = seeker.roles || [];
-      const industries = seeker.industries || [];
-      const skills = seeker.skills || [];
+      // Use query params if provided
+      // If ANY param is provided, ONLY use params (don't fallback to seeker profile)
+      const hasParams = rolesParam || industriesParam || skillsParam || location || q;
 
-      console.log('🔍 Seeker profile:', { roles, industries, skills });
+      let roles = rolesParam ? rolesParam.split(',').map(r => r.trim()) : (hasParams ? [] : (seeker.roles || []));
+      let industries = industriesParam ? industriesParam.split(',').map(i => i.trim()) : (hasParams ? [] : (seeker.industries || []));
+      let skills = skillsParam ? skillsParam.split(',').map(s => s.trim()) : (hasParams ? [] : (seeker.skills || []));
 
       // Get all companies and match their brands
       const CompanyProfile = require('../models/Company');
@@ -1919,7 +1906,9 @@ class SeekerController {
 
       for (const company of companies) {
         if (company.brands && company.brands.length > 0) {
-          for (const brand of company.brands) {
+          for (let brandIndex = 0; brandIndex < company.brands.length; brandIndex++) {
+            const brand = company.brands[brandIndex];
+
             // Get brand data
             const brandRoles = brand.roles || [];
             const brandIndustries = brand.industries || [brand.industry].filter(Boolean);
@@ -1932,8 +1921,29 @@ class SeekerController {
 
             // If ANY match found, include this brand
             if (roleMatch || industryMatch || skillMatch) {
+              // Apply location filter if provided
+              if (location) {
+                const locationMatch = company.locations && company.locations.some(loc =>
+                  loc.address && loc.address.includes(location)
+                );
+                if (!locationMatch) continue;
+              }
+
+              // Apply search query filter if provided
+              if (q) {
+                const searchQuery = q.toLowerCase();
+                const nameMatch = brand.name.toLowerCase().includes(searchQuery) ||
+                                company.companyName.toLowerCase().includes(searchQuery);
+                const industryMatch = brand.industry && brand.industry.toLowerCase().includes(searchQuery);
+                if (!nameMatch && !industryMatch) continue;
+              }
+
+              // Generate brandId using the actual brand index in the company.brands array
+              const brandId = brand.id || `${company.id}-brand-${brandIndex}`;
+              console.log(`✅ Generated brandId: ${brandId} for brand: ${brand.name} (index: ${brandIndex})`);
+
               matchedBrands.push({
-                brandId: brand.id || `${company.id}-brand-${matchedBrands.length}`,
+                brandId: brandId,
                 brandName: brand.name,
                 companyId: company.id,
                 companyName: company.companyName,
@@ -1956,8 +1966,6 @@ class SeekerController {
 
       // Sort by match score (highest first)
       matchedBrands.sort((a, b) => b.matchScore - a.matchScore);
-
-      console.log('🔍 Found matched brands:', matchedBrands.length);
 
       res.status(200).json({
         success: true,
@@ -2014,7 +2022,9 @@ class SeekerController {
 
       for (const company of companies) {
         if (company.brands && company.brands.length > 0) {
-          for (const brand of company.brands) {
+          for (let brandIndex = 0; brandIndex < company.brands.length; brandIndex++) {
+            const brand = company.brands[brandIndex];
+
             const brandRoles = brand.roles || [];
             const brandIndustries = brand.industries || [brand.industry].filter(Boolean);
             const brandSkills = brand.skills || [];
@@ -2026,8 +2036,11 @@ class SeekerController {
 
             // If ANY match found, include this brand
             if (roleMatch || industryMatch || skillMatch) {
+              // Generate brandId using the actual brand index
+              const brandId = brand.id || `${company.id}-brand-${brandIndex}`;
+
               matchedBrands.push({
-                brandId: brand.id || brand.brandId,
+                brandId: brandId,
                 brandName: brand.name,
                 companyId: company.id,
                 companyName: company.companyName,

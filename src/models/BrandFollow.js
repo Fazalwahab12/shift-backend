@@ -7,14 +7,20 @@ const { databaseService, COLLECTIONS } = require('../config/database');
 class BrandFollow {
   constructor(data = {}) {
     this.id = data.id || null;
-    
+
     // Core follow data
     this.seekerId = data.seekerId || null;
     this.brandId = data.brandId || null;
     this.companyId = data.companyId || null;
     this.brandName = data.brandName || null;
     this.companyName = data.companyName || null;
-    
+
+    // Brand specific details
+    this.brandLogo = data.brandLogo || null;
+    this.brandIndustry = data.brandIndustry || null;
+    this.brandRole = data.brandRole || null;
+    this.brandSkills = data.brandSkills || [];
+
     // Timestamps
     this.followedAt = data.followedAt || new Date().toISOString();
     this.createdAt = data.createdAt || new Date().toISOString();
@@ -255,6 +261,10 @@ class BrandFollow {
       companyId: this.companyId,
       brandName: this.brandName,
       companyName: this.companyName,
+      brandLogo: this.brandLogo,
+      brandIndustry: this.brandIndustry,
+      brandRole: this.brandRole,
+      brandSkills: this.brandSkills,
       followedAt: this.followedAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
@@ -271,6 +281,10 @@ class BrandFollow {
       brandName: this.brandName,
       companyId: this.companyId,
       companyName: this.companyName,
+      brandLogo: this.brandLogo,
+      brandIndustry: this.brandIndustry,
+      brandRole: this.brandRole,
+      brandSkills: this.brandSkills,
       followedAt: this.followedAt,
       isActive: true
     };

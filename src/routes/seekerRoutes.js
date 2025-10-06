@@ -59,7 +59,8 @@ router.post('/', authenticateToken, [
     .isEmail()
     .withMessage('Please provide a valid email address'),
   body('profilePhoto')
-    .optional()
+    .notEmpty()
+    .withMessage('Profile photo is required')
     .isString()
     .withMessage('Profile photo must be a string'),
   body('bio')
@@ -68,7 +69,7 @@ router.post('/', authenticateToken, [
     .withMessage('Bio must be less than 500 characters'),
   body('educationalLevel')
     .optional()
-    .isIn(['High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'])
+    .isIn(['No Degree', 'General Diploma', 'Higher Diploma', 'Bachelors Degree', 'Masters Degree'])
     .withMessage('Educational level must be one of the valid options'),
   // Step 2: Professional Information
   body('industries')
@@ -102,7 +103,7 @@ router.post('/', authenticateToken, [
     .withMessage('Availability must be one of the valid options'),
   body('currentStatus')
     .optional()
-    .isIn(['Student', 'Working', 'Not Working'])
+    .isIn(['Student', 'Employed', 'Job Seeker'])
     .withMessage('Current status must be one of the valid options'),
   body('workType')
     .optional()
@@ -226,10 +227,32 @@ router.get('/:seekerId/is-saved', authenticateToken, [
 
 /**
  * @route   GET /api/seekers/brand-recommendations
- * @desc    Get company brands matched to seeker's profile
+ * @desc    Get company brands matched to seeker's profile with optional filters
  * @access  Private (Seeker)
  */
-router.get('/brand-recommendations', authenticateToken, SeekerController.getBrandRecommendations);
+router.get('/brand-recommendations', [
+  authenticateToken,
+  query('roles')
+    .optional()
+    .isString()
+    .withMessage('Roles must be a comma-separated string'),
+  query('skills')
+    .optional()
+    .isString()
+    .withMessage('Skills must be a comma-separated string'),
+  query('industries')
+    .optional()
+    .isString()
+    .withMessage('Industries must be a comma-separated string'),
+  query('location')
+    .optional()
+    .isString()
+    .withMessage('Location must be a comma-separated string'),
+  query('q')
+    .optional()
+    .isString()
+    .withMessage('Search query must be a string')
+], SeekerController.getBrandRecommendations);
 
 /**
  * @route   GET /api/seekers/:seekerId
@@ -286,7 +309,7 @@ router.put('/:seekerId', authenticateToken, [
     .withMessage('Bio must be less than 500 characters'),
   body('educationalLevel')
     .optional()
-    .isIn(['High School', 'Diploma', 'Bachelor', 'Master', 'PhD', 'Other'])
+    .isIn(['No Degree', 'General Diploma', 'Higher Diploma', 'Bachelors Degree', 'Masters Degree'])
     .withMessage('Educational level must be one of the valid options'),
   // Step 2: Professional Information
   body('industries')
@@ -320,7 +343,7 @@ router.put('/:seekerId', authenticateToken, [
     .withMessage('Availability must be one of the valid options'),
   body('currentStatus')
     .optional()
-    .isIn(['Student', 'Working', 'Not Working'])
+    .isIn(['Student', 'Employed', 'Job Seeker'])
     .withMessage('Current status must be one of the valid options'),
   body('workType')
     .optional()

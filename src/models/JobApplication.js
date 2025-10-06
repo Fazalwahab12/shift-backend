@@ -1172,20 +1172,27 @@ class JobApplication {
     try {
       const Company = require('./Company');
       const company = await Company.findById(companyId);
-      
+
       if (!company) {
-        throw new Error('Company not found');
+        console.warn(`Company not found with ID: ${companyId}. Skipping block check.`);
+        return true; // Allow application if company not found
       }
 
       if (company.isSeekerBlocked(seekerId)) {
         const blockDetails = company.getBlockDetails(seekerId);
         throw new Error(`You are blocked from applying to this company. Reason: ${blockDetails.reason}`);
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error checking seeker blocked status:', error);
-      throw error;
+      // Only re-throw if it's a blocking error, not a company not found error
+      if (error.message.includes('blocked from applying')) {
+        throw error;
+      }
+      // For other errors, log and allow the application to proceed
+      console.warn('Block check failed, allowing application to proceed:', error.message);
+      return true;
     }
   }
 

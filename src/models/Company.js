@@ -978,13 +978,23 @@ class Company {
   async createThawaniCheckoutSession(paymentData) {
     try {
       const thawaniConfig = {
-        apiKey: process.env.THAWANI_SECRET_KEY || 'rRQ26GcsZzoEhbrP2HZvLYDbn9C9et',
+        apiKey: process.env.THAWANI_SECRET_KEY,
         baseUrl: process.env.THAWANI_BASE_URL || 'https://uatcheckout.thawani.om/api/v1'
       };
 
+      console.log('Thawani Config Check:', {
+        hasApiKey: !!thawaniConfig.apiKey,
+        apiKeyLength: thawaniConfig.apiKey?.length,
+        baseUrl: thawaniConfig.baseUrl
+      });
+
+      if (!thawaniConfig.apiKey) {
+        throw new Error('Thawani API key not configured. Please set THAWANI_SECRET in environment variables.');
+      }
+
       const sessionData = {
         client_reference_id: `${this.id}_${Date.now()}`,
-        mode: 'test',
+        mode: 'payment',
         products: [
           {
             name: paymentData.planName || 'Shift App Plan',
@@ -992,15 +1002,18 @@ class Company {
             unit_amount: Math.round(paymentData.amount * 1000) // Thawani expects amount in baisa (1000 baisa = 1 OMR)
           }
         ],
-        success_url: `${process.env.FRONTEND_URL || 'https://shift.om'}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL || 'https://shift.om'}/payment/cancel`,
+        success_url: paymentData.success_url || `${process.env.BACKEND_URL || 'https://62ff4cd87704.ngrok-free.app'}/api/payment/success-redirect?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: paymentData.cancel_url || `${process.env.BACKEND_URL || 'https://62ff4cd87704.ngrok-free.app'}/api/payment/cancel-redirect`,
         metadata: {
+          'Customer name': this.companyName,
+          'order id': `${this.id}_${Date.now()}`,
           company_id: this.id,
           company_name: this.companyName,
           plan_type: paymentData.planType,
           plan_name: paymentData.planName,
           amount_omr: paymentData.amount,
-          user_id: this.userId
+          user_id: this.userId,
+          session_id_placeholder: 'will_be_replaced_after_creation'
         }
       };
 
@@ -1019,7 +1032,7 @@ class Company {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'thawani-secret-key': thawaniConfig.apiKey
+          'thawani-api-key': thawaniConfig.apiKey
         },
         body: JSON.stringify(sessionData)
       });
@@ -1070,10 +1083,15 @@ class Company {
 
         await this.update({ pendingPayments: this.pendingPayments });
 
+        const publishableKey = process.env.THAWANI_PUBLISHABLE || process.env.THAWANI_PUBLISHABLE_KEY;
+        const checkoutUrl = publishableKey
+          ? `${thawaniConfig.baseUrl.replace('/api/v1', '')}/pay/${result.data.session_id}?key=${publishableKey}`
+          : `${thawaniConfig.baseUrl.replace('/api/v1', '')}/pay/${result.data.session_id}`;
+
         return {
           success: true,
           sessionId: result.data.session_id,
-          checkoutUrl: `${thawaniConfig.baseUrl.replace('/api/v1', '')}/pay/${result.data.session_id}`,
+          checkoutUrl: checkoutUrl,
           pendingPayment
         };
       } else {
@@ -2032,7 +2050,8 @@ class Company {
         role: brand.role,
         skills: brand.skills,
         totalJobs: brand.totalJobs || 0,
-        activeJobs: brand.activeJobs || 0
+        activeJobs: brand.activeJobs || 0,
+        addedAt: brand.addedAt
       })),
       primaryBrand: this.primaryBrand,
       
